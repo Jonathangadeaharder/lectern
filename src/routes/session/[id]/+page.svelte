@@ -4,9 +4,8 @@
 	import MultipleChoice from '$lib/components/session/MultipleChoice.svelte';
 	import FreeText from '$lib/components/session/FreeText.svelte';
 	import ClickLines from '$lib/components/session/ClickLines.svelte';
-	import TrueFalse from '$lib/components/session/TrueFalse.svelte';
 	import DiffViewer from '$lib/components/session/DiffViewer.svelte';
-	import CommandPalette from '$lib/components/session/CommandPalette.svelte';
+	import { setEnabled, getEnabled } from '$lib/client/sound';
 
 	let { data } = $props();
 	const sessionId = $derived(data.sessionId);
@@ -15,7 +14,7 @@
 		id: string;
 		chunkId: string;
 		position: number;
-		format: 'multiple_choice' | 'free_text' | 'click_lines' | 'true_false';
+		format: 'multiple_choice' | 'free_text' | 'click_lines';
 		type: string;
 		status: 'pending' | 'shown' | 'submitted' | 'graded' | 'skipped';
 		question: any; // Question
@@ -23,7 +22,6 @@
 
 	interface Answer {
 		questionId: string;
-		payloadJson: string | null;
 		gradingJson: string | null;
 		verdict: string | null;
 		rawScore: number | null;
@@ -36,8 +34,6 @@
 	let answers = $state<Answer[]>([]);
 	let loadingQuestions = $state(true);
 	let paused = $state(false);
-	let paletteOpen = $state(false);
-	let currentQuestionIdx = $state(0);
 
 	const currentChunk = $derived(chunks[currentChunkIdx]);
 	const currentQuestions = $derived(
@@ -50,12 +46,6 @@
 		currentQuestions.length > 0 &&
 			currentQuestions.every((q) => answers.find((a) => a.questionId === q.id))
 	);
-	const activeQuestion = $derived(currentQuestions[currentQuestionIdx] ?? nextUngraded);
-
-	$effect(() => {
-		currentChunkIdx;
-		currentQuestionIdx = 0;
-	});
 
 	let heartbeat: ReturnType<typeof setInterval> | null = null;
 
@@ -124,17 +114,6 @@
 		}
 	}
 
-	const paletteCommands = $derived([
-		{ id: 'pause', label: 'Pause session', shortcut: '⌘P', action: () => transition('pause') },
-		{ id: 'resume', label: 'Resume session', shortcut: 'Esc', action: () => transition('resume') },
-		{ id: 'end', label: 'End session', action: () => endSession() },
-		...chunks.map((c, i) => ({
-			id: `chunk-${i}`,
-			label: `Go to chunk ${i + 1}: ${c.title || `Chunk ${i + 1}`}`,
-			action: () => (currentChunkIdx = i)
-		}))
-	]);
-
 	function onKey(e: KeyboardEvent): void {
 		const target = e.target as HTMLElement;
 		const inField =
@@ -142,18 +121,18 @@
 			target instanceof HTMLTextAreaElement ||
 			target.isContentEditable;
 
-		if (paletteOpen) return;
-
 		if (e.key === 'Escape' && paused) {
 			paused = false;
 			transition('resume');
 			return;
 		}
 
-		if (e.key === 'k' && (e.metaKey || e.ctrlKey)) {
-			e.preventDefault();
-			paletteOpen = true;
-			return;
+		if (e.key === 'm' || e.key === 'M') {
+			if (e.metaKey || e.ctrlKey) {
+				e.preventDefault();
+				setEnabled(!getEnabled());
+				return;
+			}
 		}
 
 		if ((e.key === 'p' || e.key === 'P') && (e.metaKey || e.ctrlKey)) {
@@ -171,12 +150,6 @@
 		} else if (e.key === 'l' || e.key === 'L') {
 			e.preventDefault();
 			currentChunkIdx = Math.min(chunks.length - 1, currentChunkIdx + 1);
-		} else if (e.key === 'j' || e.key === 'J') {
-			e.preventDefault();
-			currentQuestionIdx = Math.min(currentQuestionIdx + 1, currentQuestions.length - 1);
-		} else if (e.key === 'k' || e.key === 'K') {
-			e.preventDefault();
-			currentQuestionIdx = Math.max(currentQuestionIdx - 1, 0);
 		} else if (e.key === 'b' || e.key === 'B') {
 			e.preventDefault();
 			paused = true;
@@ -207,20 +180,6 @@
 				format: 'click_lines',
 				questionId: nextUngraded.id,
 				marked
-			})
-		});
-		if (res.ok) await refresh();
-	}
-
-	async function submitTrueFalse(answer: boolean): Promise<void> {
-		if (!nextUngraded) return;
-		const res = await fetch(`/api/sessions/${sessionId}/answers`, {
-			method: 'POST',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({
-				format: 'true_false',
-				questionId: nextUngraded.id,
-				answer
 			})
 		});
 		if (res.ok) await refresh();
@@ -257,18 +216,6 @@
 		};
 	}
 
-	function gradedTrueFalse(q: QuestionRow): any {
-		const g = gradedFor(q.id);
-		if (!g) return undefined;
-		const a = answers.find((x) => x.questionId === q.id);
-		const payload = a ? JSON.parse(a.payloadJson ?? '{}') : {};
-		return {
-			answer: payload.answer ?? false,
-			verdict: g.verdict ?? '',
-			explanation: g.feedback ?? ''
-		};
-	}
-
 	async function endSession(): Promise<void> {
 		await fetch(`/api/sessions/${sessionId}/transition`, {
 			method: 'POST',
@@ -302,14 +249,6 @@
 		<span class="text-xs text-text-muted"
 			>chunk {currentChunkIdx + 1}/{chunks.length} · {session.state}</span
 		>
-		<button
-			type="button"
-			onclick={() => (paletteOpen = true)}
-			class="rounded-md border border-border px-2 py-0.5 text-xs text-text-muted hover:bg-surface-2"
-			title="Command palette (⌘K)"
-		>
-			⌘K
-		</button>
 	</header>
 
 	<!-- Body: 60/40 split -->
@@ -363,12 +302,6 @@
 						hunks={currentChunk.hunks}
 						onsubmit={submitClickLines}
 						graded={gradedFor(nextUngraded.id)}
-					/>
-				{:else if nextUngraded.format === 'true_false'}
-					<TrueFalse
-						question={nextUngraded.question}
-						onsubmit={submitTrueFalse}
-						graded={gradedTrueFalse(nextUngraded)}
 					/>
 				{/if}
 			{:else if allChunkQsGraded}
@@ -432,12 +365,6 @@
 		</div>
 	</footer>
 </div>
-
-<CommandPalette
-	open={paletteOpen}
-	onclose={() => (paletteOpen = false)}
-	commands={paletteCommands}
-/>
 
 {#if paused}
 	<div
