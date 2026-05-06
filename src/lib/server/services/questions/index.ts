@@ -57,7 +57,29 @@ export async function generateQuestionsForChunk(input: GenerateForChunkInput): P
 		}
 	}
 
-	const deduped = deduplicateQuestions(result.questions);
+	let deduped = deduplicateQuestions(result.questions);
+
+	if (!hasAcceptableDifficulty(deduped)) {
+		console.warn('[questions] difficulty distribution poor; retrying with emphasis');
+		const retryPrompt =
+			userPrompt +
+			'\n\nIMPORTANT: Ensure a mix of difficulties: ~30% easy, ~50% medium, ~20% hard. At least 1 easy and 1 hard if 5+ questions.';
+		try {
+			const retry = await runStructured({
+				task: 'generate_questions',
+				schema: QuestionListSchema,
+				system: prompt.system,
+				prompt: retryPrompt
+			});
+			const retryDeduped = deduplicateQuestions(retry.questions);
+			if (hasAcceptableDifficulty(retryDeduped)) {
+				deduped = retryDeduped;
+			}
+		} catch {
+			// keep original set if retry fails
+		}
+	}
+
 	persistQuestions(sessionId, chunk.id, deduped);
 	return deduped;
 }
@@ -94,6 +116,20 @@ function tokenize(text: string): Set<string> {
 			.split(/\s+/)
 			.filter((w) => w.length > 2)
 	);
+}
+
+function hasAcceptableDifficulty(questions: Question[]): boolean {
+	if (questions.length < 2) return true;
+	const counts = { easy: 0, medium: 0, hard: 0 };
+	for (const q of questions) counts[q.difficulty]++;
+	const total = questions.length;
+	const easyRatio = counts.easy / total;
+	const hardRatio = counts.hard / total;
+	const mediumRatio = counts.medium / total;
+	if (total >= 5 && (counts.easy === 0 || counts.hard === 0)) return false;
+	if (easyRatio > 0.5 || hardRatio > 0.5) return false;
+	if (mediumRatio < 0.2 && total >= 3) return false;
+	return true;
 }
 
 function chunkDiff(chunk: Chunk): string {

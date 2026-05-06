@@ -16,10 +16,11 @@
 		question: Question;
 		hunks: Hunk[];
 		onsubmit: (marked: Array<{ file: string; line: number }>) => Promise<void>;
+		onskip?: () => void;
 		graded?: { rawScore?: number; verdict?: string; feedback?: string };
 	}
 
-	let { question, hunks, onsubmit, graded }: Props = $props();
+	let { question, hunks, onsubmit, onskip, graded }: Props = $props();
 
 	let marked = $state<Set<string>>(new Set());
 	let submitting = $state(false);
@@ -101,14 +102,26 @@
 	{#if !graded}
 		<div class="flex items-center justify-between">
 			<span class="text-xs text-text-muted">{marked.size} marked</span>
-			<button
-				type="button"
-				onclick={submit}
-				disabled={submitting}
-				class="rounded-md bg-accent px-4 py-2 text-sm font-medium text-surface-0 hover:bg-accent-hover disabled:opacity-50"
-			>
-				{submitting ? 'Submitting…' : 'Submit'}
-			</button>
+			<div class="flex gap-2">
+				{#if onskip}
+					<button
+						type="button"
+						onclick={onskip}
+						disabled={submitting}
+						class="rounded-md border border-border px-4 py-2 text-sm text-text-secondary hover:bg-surface-2 disabled:opacity-50"
+					>
+						Skip
+					</button>
+				{/if}
+				<button
+					type="button"
+					onclick={submit}
+					disabled={submitting}
+					class="rounded-md bg-accent px-4 py-2 text-sm font-medium text-surface-0 hover:bg-accent-hover disabled:opacity-50"
+				>
+					{submitting ? 'Submitting…' : 'Submit'}
+				</button>
+			</div>
 		</div>
 	{:else}
 		<div class="rounded-md border border-border-subtle bg-surface-1 p-3 text-sm">

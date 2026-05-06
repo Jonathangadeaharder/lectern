@@ -8,16 +8,17 @@
 		requiredResults?: Array<{ id: string; met: 'yes' | 'partial' | 'no'; justification: string }>;
 		feedback?: string;
 		rawScore?: number;
-		verdict?: 'pass' | 'fail' | 'borderline' | 'review_needed';
+		verdict?: 'pass' | 'fail' | 'borderline' | 'review_needed' | 'skipped';
 	}
 
 	interface Props {
 		question: Question;
 		sessionId: string;
 		graded?: PartialGrade;
+		onskip?: () => void;
 	}
 
-	let { question, sessionId, graded }: Props = $props();
+	let { question, sessionId, graded, onskip }: Props = $props();
 
 	let answer = $state('');
 	let submitting = $state(false);
@@ -110,14 +111,26 @@
 	{#if !final}
 		<div class="flex items-center justify-between">
 			<p class="text-xs text-text-muted">⌘↵ to submit.</p>
-			<button
-				type="button"
-				onclick={submit}
-				disabled={!answer.trim() || submitting}
-				class="rounded-md bg-accent px-4 py-2 text-sm font-medium text-surface-0 hover:bg-accent-hover disabled:opacity-50"
-			>
-				{submitting ? 'Grading…' : 'Submit'}
-			</button>
+			<div class="flex gap-2">
+				{#if onskip}
+					<button
+						type="button"
+						onclick={onskip}
+						disabled={submitting}
+						class="rounded-md border border-border px-4 py-2 text-sm text-text-secondary hover:bg-surface-2 disabled:opacity-50"
+					>
+						Skip
+					</button>
+				{/if}
+				<button
+					type="button"
+					onclick={submit}
+					disabled={!answer.trim() || submitting}
+					class="rounded-md bg-accent px-4 py-2 text-sm font-medium text-surface-0 hover:bg-accent-hover disabled:opacity-50"
+				>
+					{submitting ? 'Grading…' : 'Submit'}
+				</button>
+			</div>
 		</div>
 	{/if}
 

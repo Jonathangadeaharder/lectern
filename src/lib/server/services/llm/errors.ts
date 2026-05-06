@@ -53,3 +53,22 @@ export class LlmProviderError extends Error {
 		this.name = 'LlmProviderError';
 	}
 }
+
+export class CircuitOpenError extends Error {
+	readonly httpStatus = 503;
+	constructor(public readonly opensAt: number) {
+		super('Circuit breaker is open; refusing LLM calls.');
+		this.name = 'CircuitOpenError';
+	}
+}
+
+export class BudgetExceededError extends Error {
+	readonly httpStatus = 429;
+	constructor(
+		public readonly used: number,
+		public readonly limit: number
+	) {
+		super(`Token budget exceeded: ${used}/${limit}`);
+		this.name = 'BudgetExceededError';
+	}
+}

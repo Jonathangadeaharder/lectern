@@ -17,7 +17,7 @@ export const answers = sqliteTable(
 		gradingJson: text('grading_json'),
 		rawScore: real('raw_score'),
 		verdict: text('verdict', {
-			enum: ['pass', 'fail', 'borderline', 'review_needed']
+			enum: ['pass', 'fail', 'borderline', 'review_needed', 'skipped']
 		}),
 		submittedAt: integer('submitted_at').notNull(),
 		gradedAt: integer('graded_at')

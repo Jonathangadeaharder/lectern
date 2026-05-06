@@ -23,11 +23,23 @@ const TrueFalseSchema = z.object({
 	questionId: z.string(),
 	answer: z.boolean()
 });
-const BodySchema = z.discriminatedUnion('format', [
+const CodeFixSchema = z.object({
+	format: z.literal('code_fix'),
+	questionId: z.string(),
+	code: z.string().min(1)
+});
+const SkipSchema = z.object({
+	format: z.string(),
+	questionId: z.string(),
+	skipped: z.literal(true)
+});
+const BodySchema = z.union([
 	McSchema,
 	ClickLinesSchema,
 	FreeTextSchema,
-	TrueFalseSchema
+	TrueFalseSchema,
+	CodeFixSchema,
+	SkipSchema
 ]);
 
 export async function POST({ params, request }) {
@@ -37,7 +49,46 @@ export async function POST({ params, request }) {
 	const parsed = BodySchema.safeParse(body);
 	if (!parsed.success) throw error(400, 'Invalid body');
 
-	if (parsed.data.format === 'free_text' && parsed.data.stream) {
+	if ('skipped' in parsed.data && parsed.data.skipped) {
+		const { eq } = await import('drizzle-orm');
+		const { getDb } = await import('$lib/server/db');
+		const { answers, sessionQuestions } = await import('$lib/server/db/schema');
+		const { randomUUID } = await import('node:crypto');
+		const db = getDb();
+		const now = Date.now();
+		const skippedResult = {
+			requiredResults: [],
+			bonusResults: [],
+			disqualifierResults: [],
+			rawScore: 0,
+			verdict: 'skipped' as const,
+			feedback: 'Question skipped.',
+			confidence: 0
+		};
+		db.transaction((tx) => {
+			tx.insert(answers)
+				.values({
+					id: randomUUID(),
+					sessionId,
+					questionId: parsed.data.questionId,
+					format: parsed.data.format,
+					payloadJson: JSON.stringify({ skipped: true }),
+					gradingJson: JSON.stringify(skippedResult),
+					rawScore: 0,
+					verdict: 'skipped',
+					submittedAt: now,
+					gradedAt: now
+				})
+				.run();
+			tx.update(sessionQuestions)
+				.set({ status: 'skipped', submittedAt: now, gradedAt: now })
+				.where(eq(sessionQuestions.id, parsed.data.questionId))
+				.run();
+		});
+		return json({ result: skippedResult });
+	}
+
+	if (parsed.data.format === 'free_text' && 'stream' in parsed.data && parsed.data.stream) {
 		const { questionId, answer } = parsed.data;
 		const encoder = new TextEncoder();
 		const stream = new ReadableStream<Uint8Array>({
@@ -78,17 +129,23 @@ export async function POST({ params, request }) {
 	}
 
 	try {
+		let payload: any;
+		const data = parsed.data as any;
+		if (data.format === 'multiple_choice') {
+			payload = { selectedOptionId: data.selectedOptionId };
+		} else if (data.format === 'click_lines') {
+			payload = { marked: data.marked };
+		} else if (data.format === 'true_false') {
+			payload = { answer: data.answer };
+		} else if (data.format === 'code_fix') {
+			payload = { code: data.code };
+		} else {
+			payload = { answer: data.answer };
+		}
 		const result = await gradeAnswer({
 			sessionId,
-			questionId: parsed.data.questionId,
-			payload:
-				parsed.data.format === 'multiple_choice'
-					? { selectedOptionId: parsed.data.selectedOptionId }
-					: parsed.data.format === 'click_lines'
-						? { marked: parsed.data.marked }
-						: parsed.data.format === 'true_false'
-							? { answer: parsed.data.answer }
-							: { answer: parsed.data.answer },
+			questionId: data.questionId,
+			payload,
 			signal: request.signal
 		});
 		return json({ result });

@@ -7,7 +7,8 @@ const VERDICT_VALUE: Record<string, number> = {
 	pass: 1,
 	borderline: 0.5,
 	fail: 0,
-	review_needed: 0.4
+	review_needed: 0.4,
+	skipped: 0
 };
 
 export interface PerChunkRow {
@@ -34,6 +35,13 @@ export interface DebriefData {
 	missedByTag: MissedByTagRow[];
 	followUps: string[];
 	generatedAt: number;
+	selfConfidence?: Array<{
+		questionId: string;
+		chunkTitle: string;
+		selfConfidence: number;
+		computedScore: number;
+	}>;
+	rawSession?: any;
 }
 
 export function generateDebrief(sessionId: string): DebriefData {
@@ -150,7 +158,38 @@ export function generateDebrief(sessionId: string): DebriefData {
 		perChunk,
 		missedByTag,
 		followUps,
-		generatedAt: Date.now()
+		generatedAt: Date.now(),
+		selfConfidence: aRows
+			.filter((a) => a.verdict !== 'skipped')
+			.map((a) => {
+				const qRow = qRows.find((q) => q.id === a.questionId);
+				const chunkMeta = allChunks.find((c) => c.id === qRow?.chunkId);
+				const score = VERDICT_VALUE[a.verdict ?? 'fail'] ?? 0;
+				return {
+					questionId: a.questionId,
+					chunkTitle: chunkMeta?.title ?? 'Unknown',
+					selfConfidence: 3,
+					computedScore: score
+				};
+			}),
+		rawSession: {
+			session: { id: session.id, state: session.state, bundleId: session.bundleId },
+			answers: aRows.map((a) => ({
+				questionId: a.questionId,
+				format: a.format,
+				verdict: a.verdict,
+				rawScore: a.rawScore,
+				gradingJson: a.gradingJson ? JSON.parse(a.gradingJson) : null
+			})),
+			questions: qRows.map((q) => ({
+				id: q.id,
+				chunkId: q.chunkId,
+				format: q.format,
+				type: q.type,
+				difficulty: q.difficulty,
+				prompt: JSON.parse(q.promptJson).prompt
+			}))
+		}
 	};
 
 	db.insert(debriefs)
