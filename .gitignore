@@ -15,3 +15,4 @@ local.db-shm
 coverage/
 .vitest/
 drizzle/meta/
+.worktrees/
