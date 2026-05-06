@@ -1,13 +1,23 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+const mockHowl = {
+	play: vi.fn(),
+	stop: vi.fn(),
+	volume: vi.fn(),
+	on: vi.fn()
+};
+
 vi.mock('howler', () => {
-	const mockHowl = {
-		play: vi.fn(),
-		stop: vi.fn(),
-		volume: vi.fn()
-	};
 	return {
-		Howl: vi.fn(() => mockHowl)
+		Howl: vi.fn((opts: any) => {
+			if (opts.onloaderror) {
+				mockHowl.on.mockImplementation((event: string, cb: Function) => {
+					if (event === 'loaderror' && opts.onloaderror) opts.onloaderror(0);
+					if (event === 'playerror' && opts.onplayerror) opts.onplayerror(0);
+				});
+			}
+			return mockHowl;
+		})
 	};
 });
 
@@ -92,6 +102,13 @@ describe('sound bus', () => {
 		it('sets volume within valid range', () => {
 			bus.setGlobalVolume(0.7);
 			expect(bus.config.volume).toBe(0.7);
+		});
+
+		it('does not clobber per-sound volume overrides', () => {
+			bus.config.perSoundOverrides = { correct: { volume: 0.2 } };
+			bus.setGlobalVolume(0.8);
+			expect(bus.config.volume).toBe(0.8);
+			expect(bus.config.perSoundOverrides.correct?.volume).toBe(0.2);
 		});
 	});
 
