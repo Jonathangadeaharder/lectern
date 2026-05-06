@@ -17,7 +17,10 @@ export interface MultipleChoicePayload {
 export interface FreeTextPayload {
 	answer: string;
 }
-export type AnswerPayload = ClickLinesPayload | MultipleChoicePayload | FreeTextPayload;
+export interface TrueFalsePayload {
+	answer: boolean;
+}
+export type AnswerPayload = ClickLinesPayload | MultipleChoicePayload | FreeTextPayload | TrueFalsePayload;
 
 export interface GradeArgs {
 	sessionId: string;
@@ -36,6 +39,9 @@ export async function gradeAnswer(args: GradeArgs): Promise<GradingResult> {
 			break;
 		case 'click_lines':
 			final = gradeClickLines(question, args.payload as ClickLinesPayload);
+			break;
+		case 'true_false':
+			final = gradeTrueFalse(question, args.payload as TrueFalsePayload);
 			break;
 		case 'free_text':
 			if (!rubric) throw new Error(`free_text question ${question.id} has no rubric`);
@@ -176,6 +182,24 @@ function gradeMultipleChoice(question: Question, payload: MultipleChoicePayload)
 		rawScore: isCorrect ? 1 : 0,
 		verdict: isCorrect ? 'pass' : 'fail',
 		feedback: correct?.explanation ?? (isCorrect ? 'Correct.' : 'Incorrect.')
+	};
+}
+
+function gradeTrueFalse(question: Question, payload: TrueFalsePayload): GradingResult {
+	const isCorrect = question.correctAnswer === payload.answer;
+	return {
+		requiredResults: [
+			{
+				id: 'tf-correct',
+				met: isCorrect ? 'yes' : 'no',
+				justification: isCorrect ? 'Correct answer.' : 'Wrong answer.'
+			}
+		],
+		bonusResults: [],
+		disqualifierResults: [],
+		rawScore: isCorrect ? 1 : 0,
+		verdict: isCorrect ? 'pass' : 'fail',
+		feedback: question.explanation ?? (isCorrect ? 'Correct.' : 'Incorrect.')
 	};
 }
 

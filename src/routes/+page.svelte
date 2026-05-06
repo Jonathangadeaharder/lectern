@@ -40,7 +40,7 @@
 				Continue to setup →
 			</a>
 		</section>
-	{:else}
+		{:else}
 		<section class="flex flex-col gap-3">
 			<h2 class="text-lg font-medium text-text-primary">Start a review</h2>
 			<form method="POST" action="/api/sessions/create" class="flex gap-2">
@@ -57,9 +57,14 @@
 					Ingest
 				</button>
 			</form>
-			<a class="mt-4 text-sm text-text-muted hover:text-text-primary" href="/settings/keys">
-				Settings →
-			</a>
+			<div class="mt-4 flex gap-4">
+				<a class="text-sm text-text-muted hover:text-text-primary" href="/settings/keys">
+					Settings →
+				</a>
+				<a class="text-sm text-text-muted hover:text-text-primary" href="/dashboard">
+					Dashboard →
+				</a>
+			</div>
 		</section>
 	{/if}
 </main>

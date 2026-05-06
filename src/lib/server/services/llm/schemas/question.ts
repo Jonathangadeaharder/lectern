@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { RubricSchema } from './rubric';
 
-export const QuestionFormatSchema = z.enum(['multiple_choice', 'free_text', 'click_lines']);
+export const QuestionFormatSchema = z.enum(['multiple_choice', 'free_text', 'click_lines', 'true_false']);
 export const QuestionTypeSchema = z.enum(['anchor', 'implication']);
 export const DifficultySchema = z.enum(['easy', 'medium', 'hard']);
 
@@ -32,6 +32,8 @@ export const QuestionSchema = z.object({
 	contextLines: z.array(ContextLineSchema),
 	options: z.array(McOptionSchema).optional(),
 	expectedLines: z.array(ExpectedLineSchema).optional(),
+	correctAnswer: z.boolean().optional(),
+	explanation: z.string().optional(),
 	rubric: RubricSchema.optional(),
 	skillTags: z.array(z.string()),
 	difficulty: DifficultySchema.default('medium'),

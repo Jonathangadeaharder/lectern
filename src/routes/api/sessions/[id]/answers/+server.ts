@@ -18,7 +18,17 @@ const FreeTextSchema = z.object({
 	answer: z.string().min(1),
 	stream: z.boolean().optional()
 });
-const BodySchema = z.discriminatedUnion('format', [McSchema, ClickLinesSchema, FreeTextSchema]);
+const TrueFalseSchema = z.object({
+	format: z.literal('true_false'),
+	questionId: z.string(),
+	answer: z.boolean()
+});
+const BodySchema = z.discriminatedUnion('format', [
+	McSchema,
+	ClickLinesSchema,
+	FreeTextSchema,
+	TrueFalseSchema
+]);
 
 export async function POST({ params, request }) {
 	const sessionId = params.id;
@@ -76,7 +86,9 @@ export async function POST({ params, request }) {
 					? { selectedOptionId: parsed.data.selectedOptionId }
 					: parsed.data.format === 'click_lines'
 						? { marked: parsed.data.marked }
-						: { answer: parsed.data.answer },
+						: parsed.data.format === 'true_false'
+							? { answer: parsed.data.answer }
+							: { answer: parsed.data.answer },
 			signal: request.signal
 		});
 		return json({ result });

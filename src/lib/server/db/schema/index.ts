@@ -7,3 +7,7 @@ export * from './chunks';
 export * from './preflight';
 export * from './debriefs';
 export * from './pr_agent_runs';
+export * from './mastery';
+export * from './repo_conventions';
+export * from './bug_patterns';
+export * from './session_activity';
