@@ -1,19 +1,20 @@
 import { eq, gte } from 'drizzle-orm';
 import { getDb } from '../../db';
 import {
-	answers,
-	bundles,
-	debriefs,
-	repoCompetence,
-	repoConventions,
-	repoWeakSpots,
-	sessionActivity,
-	sessionQuestions,
 	sessions,
-	skillMastery
+	answers,
+	sessionQuestions,
+	bundles,
+	sessionActivity,
+	repoCompetence,
+	skillMastery,
+	debriefs,
+	repoWeakSpots,
+	repoConventions,
+	masteryHistory
 } from '../../db/schema';
-import { type BugPatternRow, getBugPatterns } from '../bug_mining';
-import { type SkillMasteryRow, getMasteryByTag } from '../mastery';
+import { getMasteryByTag, type SkillMasteryRow } from '../mastery';
+import { getBugPatterns, type BugPatternRow } from '../bug_mining';
 
 export interface HeatmapDay {
 	date: string;
@@ -67,7 +68,9 @@ export interface DashboardData {
 
 export function getDashboardData(days = 90): DashboardData {
 	const db = getDb();
-	const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+	const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000)
+		.toISOString()
+		.slice(0, 10);
 
 	const activities = db
 		.select()
@@ -103,7 +106,7 @@ export function getDashboardData(days = 90): DashboardData {
 			totalSessions: rc.totalSessions,
 			avgScore: rc.avgScore,
 			lastSessionAt: rc.lastSessionAt,
-			topWeakTag: weakSpots.length > 0 ? (weakSpots[0]?.tag ?? null) : null
+			topWeakTag: weakSpots.length > 0 ? weakSpots[0]!.tag : null
 		};
 	});
 
@@ -115,11 +118,23 @@ export function getDashboardData(days = 90): DashboardData {
 		.slice(0, 10);
 
 	const recentSessions: RecentSession[] = recentSessionRows.map((s) => {
-		const bundle = db.select().from(bundles).where(eq(bundles.id, s.bundleId)).get();
+		const bundle = db
+			.select()
+			.from(bundles)
+			.where(eq(bundles.id, s.bundleId))
+			.get();
 
-		const aRows = db.select().from(answers).where(eq(answers.sessionId, s.id)).all();
+		const aRows = db
+			.select()
+			.from(answers)
+			.where(eq(answers.sessionId, s.id))
+			.all();
 
-		const debrief = db.select().from(debriefs).where(eq(debriefs.sessionId, s.id)).get();
+		const debrief = db
+			.select()
+			.from(debriefs)
+			.where(eq(debriefs.sessionId, s.id))
+			.get();
 
 		return {
 			sessionId: s.id,
@@ -137,11 +152,10 @@ export function getDashboardData(days = 90): DashboardData {
 	const allActivities = db.select().from(sessionActivity).all();
 	const totalSessions = db.select().from(sessions).all().length;
 	const totalQuestions = db.select().from(answers).all().length;
-	const allScores = allActivities
-		.filter((a) => a.avgScore !== null)
-		.map((a) => a.avgScore as number);
-	const overallAvgScore =
-		allScores.length > 0 ? allScores.reduce((s, n) => s + n, 0) / allScores.length : null;
+	const allScores = allActivities.filter((a) => a.avgScore !== null).map((a) => a.avgScore!);
+	const overallAvgScore = allScores.length > 0
+		? allScores.reduce((s, n) => s + n, 0) / allScores.length
+		: null;
 
 	return {
 		heatmap,
@@ -156,7 +170,16 @@ export function getDashboardData(days = 90): DashboardData {
 }
 
 function buildTrend(mastery: SkillMasteryRow): number[] {
-	return [mastery.ewmaScore];
+	const db = getDb();
+	const rows = db
+		.select()
+		.from(masteryHistory)
+		.all()
+		.filter((h) => h.tag === mastery.tag && (h.repoSlug ?? '') === (mastery.repoSlug ?? ''))
+		.sort((a, b) => a.createdAt - b.createdAt)
+		.slice(-30);
+	if (rows.length === 0) return [mastery.ewmaScore];
+	return rows.map((r) => r.ewmaScore);
 }
 
 function buildCalibration(): CalibrationPoint[] {
@@ -165,17 +188,23 @@ function buildCalibration(): CalibrationPoint[] {
 	const points: CalibrationPoint[] = [];
 
 	for (const d of debriefRows) {
-		const aRows = db.select().from(answers).where(eq(answers.sessionId, d.sessionId)).all();
+		const aRows = db
+			.select()
+			.from(answers)
+			.where(eq(answers.sessionId, d.sessionId))
+			.all();
 
 		if (aRows.length === 0) continue;
 
-		const actual = aRows.filter((a) => a.verdict === 'pass').length / aRows.length;
+		const actual =
+			aRows.filter((a) => a.verdict === 'pass').length / aRows.length;
 		const predicted = d.confidenceScore / 100;
 
 		const bucket = Math.round(predicted * 10) / 10;
 		const existing = points.find((p) => p.predicted === bucket);
 		if (existing) {
-			existing.actual = (existing.actual * existing.count + actual) / (existing.count + 1);
+			existing.actual =
+				(existing.actual * existing.count + actual) / (existing.count + 1);
 			existing.count++;
 		} else {
 			points.push({ predicted: bucket, actual, count: 1 });

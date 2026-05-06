@@ -12,6 +12,7 @@ import {
 	type Rubric
 } from '../llm/schemas';
 import { computeScore } from './score';
+import { updateMasteryFromSession } from '../mastery';
 
 export interface ClickLinesPayload {
 	marked: Array<{ file: string; line: number }>;
@@ -66,6 +67,7 @@ export async function gradeAnswer(args: GradeArgs): Promise<GradingResult> {
 	}
 
 	persistAnswer(args, final);
+	updateMasteryFromSession(args.sessionId);
 	return final;
 }
 
@@ -132,6 +134,7 @@ export async function* streamGradeFreeText(args: {
 		{ sessionId: args.sessionId, questionId: args.questionId, payload: { answer: args.answer } },
 		result
 	);
+	updateMasteryFromSession(args.sessionId);
 	yield { final: result };
 }
 

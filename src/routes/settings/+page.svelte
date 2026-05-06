@@ -1,6 +1,5 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { getTheme, toggleTheme } from '$lib/client/theme.svelte';
 
 	interface Status {
 		endpoint: string | null;
@@ -10,6 +9,8 @@
 
 	let status = $state<Status | null>(null);
 	let loading = $state(true);
+	let resetting = $state(false);
+	let resetResult = $state<string | null>(null);
 
 	onMount(async () => {
 		await refresh();
@@ -24,6 +25,24 @@
 			loading = false;
 		}
 	}
+
+	async function resetAllMastery(): Promise<void> {
+		resetting = true;
+		resetResult = null;
+		try {
+			const res = await fetch('/api/mastery/reset', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+			if (res.ok) {
+				const data = await res.json();
+				resetResult = `Reset ${data.reset} skill(s).`;
+			} else {
+				resetResult = 'Reset failed.';
+			}
+		} catch {
+			resetResult = 'Reset failed.';
+		} finally {
+			resetting = false;
+		}
+	}
 </script>
 
 <main class="mx-auto flex min-h-screen max-w-2xl flex-col gap-6 px-6 py-12">
@@ -31,20 +50,6 @@
 		<h1 class="text-2xl font-semibold text-text-primary">Settings</h1>
 		<a href="/" class="text-sm text-text-muted hover:text-text-primary">← Home</a>
 	</header>
-
-	<section class="flex flex-col gap-3 rounded-md border border-border bg-surface-1 p-4">
-		<header>
-			<h2 class="text-base font-medium text-text-primary">Appearance</h2>
-			<p class="text-sm text-text-secondary">Toggle between dark and light themes.</p>
-		</header>
-		<button
-			type="button"
-			onclick={toggleTheme}
-			class="self-start rounded-md border border-border px-3 py-1.5 text-sm hover:bg-surface-2"
-		>
-			Switch to {getTheme() === 'dark' ? 'light' : 'dark'} mode
-		</button>
-	</section>
 
 	<section class="flex flex-col gap-3 rounded-md border border-border bg-surface-1 p-4">
 		<header>
@@ -101,14 +106,18 @@
 
 	<section class="flex flex-col gap-3 rounded-md border border-border bg-surface-1 p-4">
 		<header>
-			<h2 class="text-base font-medium text-text-primary">Data &amp; Keys</h2>
-			<p class="text-sm text-text-secondary">Clear session data or remove stored API keys.</p>
+			<h2 class="text-base font-medium text-text-primary">Mastery</h2>
+			<p class="text-sm text-text-secondary">Reset all skill mastery scores to initial state.</p>
 		</header>
-		<a
-			href="/settings/data"
-			class="self-start rounded-md border border-border px-3 py-1.5 text-sm hover:bg-surface-2"
+		<button
+			onclick={resetAllMastery}
+			disabled={resetting}
+			class="self-start rounded-md border border-red-300 px-3 py-1.5 text-sm text-red-600 hover:bg-red-50 disabled:opacity-50"
 		>
-			Manage
-		</a>
+			{resetting ? 'Resetting…' : 'Reset All Mastery'}
+		</button>
+		{#if resetResult}
+			<p class="text-sm text-text-secondary">{resetResult}</p>
+		{/if}
 	</section>
 </main>

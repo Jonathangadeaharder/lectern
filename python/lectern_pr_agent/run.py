@@ -89,12 +89,56 @@ def run_pr_agent(repo: Path, diff_patch: Path) -> dict:
 def map_to_contract(raw: dict) -> dict:
     """Best-effort map PR-Agent's free-form output to v1 contract.
 
-    PR-Agent's output is not strictly structured — for v1.0 we treat findings as
-    a single bucket and let the classifier in the Lectern preflight stage assign tiers
-    based on category text.
+    PR-Agent's output is not strictly structured — for v1.0 we parse stdout
+    for structured finding blocks and extract them. Falls back to section-based
+    heuristic parsing when structured output is unavailable.
     """
     findings: list[dict] = []
-    summary = raw.get("raw_stdout", "")[-8000:]
+    raw_stdout = raw.get("raw_stdout", "")
+    summary = raw_stdout[-8000:] if raw_stdout else ""
+
+    try:
+        parsed = json.loads(raw_stdout)
+        if isinstance(parsed, dict):
+            if "findings" in parsed and isinstance(parsed["findings"], list):
+                for i, f in enumerate(parsed["findings"]):
+                    if isinstance(f, dict):
+                        findings.append({
+                            "id": f.get("id", f"f{i+1}"),
+                            "category": f.get("category", f.get("type", "unknown")),
+                            "severityHint": f.get("severityHint", f.get("severity", None)),
+                            "file": f.get("file", f.get("path", None)),
+                            "line": f.get("line", f.get("start_line", None)),
+                            "endLine": f.get("endLine", f.get("end_line", None)),
+                            "message": f.get("message", f.get("body", "")),
+                            "suggestion": f.get("suggestion", f.get("fix", None)),
+                        })
+            summary = parsed.get("summary", summary)
+    except (json.JSONDecodeError, TypeError):
+        import re
+
+        file_pattern = re.compile(r"^(?:\s*[-*]\s*)?`?([^`\s]+\.\w+)`?(?::(\d+))?", re.MULTILINE)
+        section_pattern = re.compile(r"#{1,4}\s+(.+?)(?:\n|$)", re.MULTILINE)
+
+        lines = raw_stdout.split("\n")
+        current_category = "general"
+        fid = 0
+        for line in lines:
+            sec_match = section_pattern.match(line)
+            if sec_match:
+                current_category = sec_match.group(1).strip().lower()
+                continue
+            fmatch = file_pattern.search(line)
+            if fmatch:
+                fid += 1
+                findings.append({
+                    "id": f"f{fid}",
+                    "category": current_category,
+                    "file": fmatch.group(1),
+                    "line": int(fmatch.group(2)) if fmatch.group(2) else None,
+                    "message": line.strip(),
+                })
+
     return {"task": "review", "findings": findings, "summary": summary, "raw": raw}
 
 

@@ -1,17 +1,18 @@
-import { randomUUID } from 'node:crypto';
 import { eq } from 'drizzle-orm';
 import parseDiff from 'parse-diff';
+import { randomUUID } from 'node:crypto';
 import { getDb } from '../../db';
 import { bundles } from '../../db/schema';
 import { isBinary } from './binary';
-import { bundlePath as bundleFilePath, writeBundle } from './bundle';
+import { writeBundle, bundlePath as bundleFilePath } from './bundle';
 import { githubClient } from './github';
+import { gitlabClient } from './gitlab';
 import type { BundleFileEntry, BundleManifest, IngestProgressEvent, PlatformClient } from './types';
-import { type ParsedPrUrl, parsePrUrl, repoSlug } from './url';
+import { parsePrUrl, repoSlug, type ParsedPrUrl } from './url';
 
 export class IngestionAuthError extends Error {
 	constructor(public readonly platform: 'github' | 'gitlab') {
-		super(`Authentication required for ${platform}.`);
+		super(`Authentication required. Add a source token in Settings.`);
 		this.name = 'IngestionAuthError';
 	}
 }
@@ -23,13 +24,11 @@ export interface IngestOptions {
 
 function clientFor(platform: 'github' | 'gitlab'): PlatformClient {
 	if (platform === 'github') return githubClient;
-	throw new Error('gitlab.com client deferred to v1.1');
+	if (platform === 'gitlab') return gitlabClient;
+	throw new Error(`unsupported platform: ${platform}`);
 }
 
-export async function ingestFromUrl(
-	url: string,
-	opts: IngestOptions = {}
-): Promise<{ id: string; filePath: string; sizeBytes: number }> {
+export async function ingestFromUrl(url: string, opts: IngestOptions = {}): Promise<{ id: string; filePath: string; sizeBytes: number }> {
 	const parsed = parsePrUrl(url);
 	const client = clientFor(parsed.platform);
 	const emit = opts.onProgress ?? (() => undefined);
@@ -60,17 +59,15 @@ export async function ingestFromUrl(
 			const baseRef = meta.baseSha;
 			const headRef = meta.headSha;
 
-			const baseFile =
-				f.from && f.from !== '/dev/null'
-					? await client.fetchFile(parsed, f.from, baseRef, opts.signal)
-					: null;
+			const baseFile = f.from && f.from !== '/dev/null'
+				? await client.fetchFile(parsed, f.from, baseRef, opts.signal)
+				: null;
 			filesDone += 1;
 			emit({ step: 'files', filesDone, filesTotal: totalFiles });
 
-			const headFile =
-				f.to && f.to !== '/dev/null'
-					? await client.fetchFile(parsed, f.to, headRef, opts.signal)
-					: null;
+			const headFile = f.to && f.to !== '/dev/null'
+				? await client.fetchFile(parsed, f.to, headRef, opts.signal)
+				: null;
 			filesDone += 1;
 			emit({ step: 'files', filesDone, filesTotal: totalFiles });
 
@@ -157,7 +154,7 @@ export async function ingestFromUrl(
 	} catch (e) {
 		const status = (e as { status?: number }).status;
 		if (status === 401 || status === 403) {
-			emit({ step: 'error', kind: 'auth', message: 'Authentication required.' });
+			emit({ step: 'error', kind: 'auth', message: 'Authentication required. Add a source token in Settings.' });
 			throw new IngestionAuthError(parsed.platform);
 		}
 		emit({
