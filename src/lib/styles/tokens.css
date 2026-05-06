@@ -1,0 +1,50 @@
+/* Design tokens — SPEC-0014. Dark-only for v1.0. */
+:root,
+[data-theme='dark'] {
+	/* Surfaces (HSL channels) */
+	--surface-0: 220 13% 9%;
+	--surface-1: 220 13% 12%;
+	--surface-2: 220 13% 16%;
+	--surface-3: 220 13% 20%;
+
+	/* Borders */
+	--border-subtle: 220 13% 20%;
+	--border-default: 220 13% 25%;
+	--border-strong: 220 13% 35%;
+
+	/* Text hierarchy */
+	--text-primary: 220 10% 95%;
+	--text-secondary: 220 10% 75%;
+	--text-muted: 220 10% 55%;
+	--text-disabled: 220 10% 35%;
+
+	/* Accent — desaturated cyan */
+	--accent: 195 40% 55%;
+	--accent-hover: 195 45% 65%;
+	--accent-muted: 195 30% 35%;
+
+	/* State colors */
+	--state-success: 145 50% 50%;
+	--state-success-bg: 145 50% 18%;
+	--state-warning: 38 80% 55%;
+	--state-warning-bg: 38 80% 18%;
+	--state-error: 358 65% 58%;
+	--state-error-bg: 358 65% 18%;
+	--state-info: 210 65% 60%;
+	--state-info-bg: 210 65% 18%;
+
+	/* Typography */
+	--font-sans: 'Geist Variable', 'Inter', system-ui, -apple-system, sans-serif;
+	--font-mono: 'Geist Mono Variable', 'JetBrains Mono', 'SF Mono', Consolas, monospace;
+
+	/* Motion */
+	--duration-fast: 50ms;
+	--duration-base: 120ms;
+	--duration-slow: 200ms;
+	--duration-slower: 400ms;
+	--ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+	--ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+
+	/* Layering */
+	--blur: 12px;
+}

@@ -1,0 +1,17 @@
+node_modules/
+.svelte-kit/
+build/
+.env
+.env.*
+!.env.example
+*.log
+local.db
+local.db-journal
+local.db-wal
+local.db-shm
+.DS_Store
+.vscode/
+.idea/
+coverage/
+.vitest/
+drizzle/meta/
