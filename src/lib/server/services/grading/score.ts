@@ -9,6 +9,7 @@ const VERDICT_VALUE: Record<'yes' | 'partial' | 'no', number> = {
 export interface ComputedScore {
 	rawScore: number;
 	verdict: 'pass' | 'fail' | 'borderline' | 'review_needed';
+	confidence: number;
 }
 
 /**
@@ -19,15 +20,23 @@ export interface ComputedScore {
  *   dqPenalty = 0.5 * count(triggered disqualifiers)
  *   raw      = clamp(reqScore - dqPenalty, 0, 1)
  *   bonus is gathered for display but does NOT boost score in v1.
+ *
+ * Confidence:
+ *   - 1.0 if all required points have clear yes/no answers
+ *   - 0.8 if any partial answers
+ *   - 0.5 if borderline verdict
+ *   - 0.3 if fallback was used (no required results)
  */
 export function computeScore(rubric: Rubric, result: GradingResult): ComputedScore {
 	const reqMaxWeight = rubric.requiredPoints.reduce((s, p) => s + p.weight, 0) || 1;
 	const reqWeightById = new Map(rubric.requiredPoints.map((p) => [p.id, p.weight]));
 
 	let reqGot = 0;
+	let hasPartial = false;
 	for (const r of result.requiredResults) {
 		const weight = reqWeightById.get(r.id) ?? 0;
 		reqGot += weight * VERDICT_VALUE[r.met];
+		if (r.met === 'partial') hasPartial = true;
 	}
 	const reqScore = reqGot / reqMaxWeight;
 
@@ -42,7 +51,20 @@ export function computeScore(rubric: Rubric, result: GradingResult): ComputedSco
 	else if (raw < borderlineMin) verdict = 'fail';
 	else verdict = 'borderline';
 
-	return { rawScore: raw, verdict };
+	const confidence = computeConfidence(result, verdict, hasPartial);
+
+	return { rawScore: raw, verdict, confidence };
+}
+
+function computeConfidence(
+	result: GradingResult,
+	verdict: ComputedScore['verdict'],
+	hasPartial: boolean
+): number {
+	if (result.requiredResults.length === 0) return 0.3;
+	if (verdict === 'borderline') return 0.5;
+	if (hasPartial) return 0.8;
+	return 1.0;
 }
 
 function clamp(n: number, lo: number, hi: number): number {
