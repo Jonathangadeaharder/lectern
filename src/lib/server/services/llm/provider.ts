@@ -1,8 +1,10 @@
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
-import { getQuickConfig, type QuickConfig } from './quick_config';
+import type { LanguageModelV1 } from 'ai';
 import { getKey } from '../secrets/keychain';
 import { LlmAuthError, LlmNotConfiguredError } from './errors';
-import type { LanguageModelV1 } from 'ai';
+import { type QuickConfig, getQuickConfig } from './quick_config';
+import { getTaskOverride } from './task_config';
+import type { TaskName } from './tasks';
 
 let cachedKey: string | undefined;
 let cachedConfig: QuickConfig | undefined;
@@ -12,7 +14,7 @@ export function invalidateProviderCache(): void {
 	cachedConfig = undefined;
 }
 
-export async function getModel(): Promise<LanguageModelV1> {
+export async function getModel(task?: TaskName): Promise<LanguageModelV1> {
 	const cfg = (await getQuickConfig()) ?? undefined;
 	if (!cfg) throw new LlmNotConfiguredError();
 
@@ -22,14 +24,27 @@ export async function getModel(): Promise<LanguageModelV1> {
 	cachedKey = token;
 	cachedConfig = cfg;
 
+	let endpoint = cfg.endpoint;
+	let model = cfg.model;
+	let headers = cfg.headers;
+
+	if (task) {
+		const override = await getTaskOverride(task);
+		if (override) {
+			if (override.endpoint) endpoint = override.endpoint;
+			if (override.model) model = override.model;
+			if (override.headers) headers = { ...headers, ...override.headers };
+		}
+	}
+
 	const provider = createOpenAICompatible({
 		name: 'lectern-default',
-		baseURL: cfg.endpoint,
+		baseURL: endpoint,
 		apiKey: token,
-		headers: cfg.headers
+		headers
 	});
 
-	return provider.chatModel(cfg.model);
+	return provider.chatModel(model);
 }
 
 /** Build a provider from explicit values (used by `testConnection` before persisting). */
@@ -48,7 +63,11 @@ export function buildModelFromValues(
 	return provider.chatModel(model);
 }
 
-export function getCachedConfig(): { endpoint?: string; model?: string; headers?: Record<string, string> } {
+export function getCachedConfig(): {
+	endpoint?: string;
+	model?: string;
+	headers?: Record<string, string>;
+} {
 	return {
 		endpoint: cachedConfig?.endpoint,
 		model: cachedConfig?.model,

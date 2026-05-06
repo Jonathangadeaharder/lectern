@@ -1,11 +1,16 @@
-import { eq } from 'drizzle-orm';
 import { randomUUID } from 'node:crypto';
+import { eq } from 'drizzle-orm';
 import { getDb } from '../../db';
 import { answers, sessionQuestions } from '../../db/schema';
 import { runStructured, streamStructured } from '../llm';
 import { LlmAbortError, LlmSchemaError } from '../llm/errors';
-import { GradingResultSchema, type GradingResult, type Question, type Rubric } from '../llm/schemas';
 import * as gradePrompt from '../llm/prompts/grade_freetext';
+import {
+	type GradingResult,
+	GradingResultSchema,
+	type Question,
+	type Rubric
+} from '../llm/schemas';
 import { computeScore } from './score';
 
 export interface ClickLinesPayload {
@@ -70,7 +75,7 @@ export async function* streamGradeFreeText(args: {
 		userAnswer: args.answer
 	});
 
-	let stream;
+	let stream: Awaited<ReturnType<typeof streamStructured>>;
 	try {
 		stream = await streamStructured({
 			task: 'grade_freetext',
@@ -81,11 +86,10 @@ export async function* streamGradeFreeText(args: {
 		});
 	} catch (e) {
 		if (e instanceof LlmAbortError) throw e;
-		// Retry-once on schema/provider errors.
 		stream = await streamStructured({
 			task: 'grade_freetext',
 			schema: GradingResultSchema,
-			system: gradePrompt.system + '\n\nOutput JSON matching the schema EXACTLY.',
+			system: `${gradePrompt.system}\n\nOutput JSON matching the schema EXACTLY.`,
 			prompt: userPrompt,
 			signal: args.signal
 		});
@@ -110,7 +114,8 @@ export async function* streamGradeFreeText(args: {
 	const result: GradingResult = {
 		...llmFinal,
 		rawScore: computed.rawScore,
-		verdict: computed.verdict
+		verdict: computed.verdict,
+		confidence: computed.confidence
 	};
 
 	persistAnswer(
@@ -147,7 +152,7 @@ async function gradeFreeText(args: {
 			llm = await runStructured({
 				task: 'grade_freetext',
 				schema: GradingResultSchema,
-				system: gradePrompt.system + '\n\nOutput JSON matching the schema EXACTLY.',
+				system: `${gradePrompt.system}\n\nOutput JSON matching the schema EXACTLY.`,
 				prompt: userPrompt,
 				signal: args.signal
 			}).catch(() => borderlineFallback());
@@ -157,7 +162,12 @@ async function gradeFreeText(args: {
 	}
 
 	const computed = computeScore(args.rubric, llm);
-	return { ...llm, rawScore: computed.rawScore, verdict: computed.verdict };
+	return {
+		...llm,
+		rawScore: computed.rawScore,
+		verdict: computed.verdict,
+		confidence: computed.confidence
+	};
 }
 
 function gradeMultipleChoice(question: Question, payload: MultipleChoicePayload): GradingResult {
@@ -175,7 +185,8 @@ function gradeMultipleChoice(question: Question, payload: MultipleChoicePayload)
 		disqualifierResults: [],
 		rawScore: isCorrect ? 1 : 0,
 		verdict: isCorrect ? 'pass' : 'fail',
-		feedback: correct?.explanation ?? (isCorrect ? 'Correct.' : 'Incorrect.')
+		feedback: correct?.explanation ?? (isCorrect ? 'Correct.' : 'Incorrect.'),
+		confidence: 1.0
 	};
 }
 
@@ -190,7 +201,8 @@ function gradeClickLines(question: Question, payload: ClickLinesPayload): Gradin
 	const recall = expectedSet.size > 0 ? tp / expectedSet.size : 0;
 	const raw = 0.5 * precision + 0.5 * recall;
 
-	const verdict: GradingResult['verdict'] = raw >= 0.8 ? 'pass' : raw >= 0.5 ? 'borderline' : 'fail';
+	const verdict: GradingResult['verdict'] =
+		raw >= 0.8 ? 'pass' : raw >= 0.5 ? 'borderline' : 'fail';
 	const missed = expected.filter((e) => !markedSet.has(e));
 	const wrong = marked.filter((m) => !expectedSet.has(m));
 
@@ -217,7 +229,8 @@ function gradeClickLines(question: Question, payload: ClickLinesPayload): Gradin
 			wrong.length ? `Extra: ${wrong.join(', ')}` : null
 		]
 			.filter(Boolean)
-			.join(' • ')
+			.join(' • '),
+		confidence: verdict === 'borderline' ? 0.8 : 1.0
 	};
 }
 
@@ -228,17 +241,14 @@ function borderlineFallback(): GradingResult {
 		disqualifierResults: [],
 		rawScore: 0.6,
 		verdict: 'borderline',
-		feedback: 'Grader output unstable; treating as borderline.'
+		feedback: 'Grader output unstable; treating as borderline.',
+		confidence: 0.3
 	};
 }
 
 function loadQuestion(questionId: string): { question: Question; rubric: Rubric | null } {
 	const db = getDb();
-	const row = db
-		.select()
-		.from(sessionQuestions)
-		.where(eq(sessionQuestions.id, questionId))
-		.get();
+	const row = db.select().from(sessionQuestions).where(eq(sessionQuestions.id, questionId)).get();
 	if (!row) throw new Error(`question not found: ${questionId}`);
 	const question = JSON.parse(row.promptJson) as Question;
 	const rubric = row.rubricJson ? (JSON.parse(row.rubricJson) as Rubric) : null;

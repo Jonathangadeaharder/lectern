@@ -20,7 +20,8 @@ export const GradingResultSchema = z.object({
 	disqualifierResults: z.array(DisqualifierResultSchema).default([]),
 	rawScore: z.number().min(0).max(1),
 	verdict: VerdictSchema,
-	feedback: z.string().min(1)
+	feedback: z.string().min(1),
+	confidence: z.number().min(0).max(1).optional()
 });
 
 export type Verdict = z.infer<typeof VerdictSchema>;
