@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest';
-import { ewma, classifyLevel, decayScore } from './index';
+import { describe, expect, it } from 'vitest';
+import { classifyLevel, decayScore, ewma } from './index';
 
 describe('ewma', () => {
 	it('returns alpha * obs + (1-alpha) * prev', () => {

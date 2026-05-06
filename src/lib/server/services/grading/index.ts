@@ -25,7 +25,11 @@ export interface FreeTextPayload {
 export interface TrueFalsePayload {
 	answer: boolean;
 }
-export type AnswerPayload = ClickLinesPayload | MultipleChoicePayload | FreeTextPayload | TrueFalsePayload;
+export type AnswerPayload =
+	| ClickLinesPayload
+	| MultipleChoicePayload
+	| FreeTextPayload
+	| TrueFalsePayload;
 
 export interface GradeArgs {
 	sessionId: string;

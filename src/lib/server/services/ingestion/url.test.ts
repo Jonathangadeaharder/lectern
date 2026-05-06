@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest';
-import { parsePrUrl, repoSlug, InvalidPrUrlError } from './url';
+import { describe, expect, it } from 'vitest';
+import { InvalidPrUrlError, parsePrUrl, repoSlug } from './url';
 
 describe('parsePrUrl', () => {
 	it('parses a standard GitHub PR URL', () => {
@@ -54,10 +54,20 @@ describe('parsePrUrl', () => {
 
 describe('repoSlug', () => {
 	it('joins owner and repo with double underscore', () => {
-		expect(repoSlug({ platform: 'github', host: 'github.com', owner: 'acme', repo: 'widget', prNumber: 1 })).toBe('acme__widget');
+		expect(
+			repoSlug({
+				platform: 'github',
+				host: 'github.com',
+				owner: 'acme',
+				repo: 'widget',
+				prNumber: 1
+			})
+		).toBe('acme__widget');
 	});
 
 	it('sanitizes special characters in owner/repo', () => {
-		expect(repoSlug({ platform: 'github', host: 'github.com', owner: 'a/b', repo: 'c d', prNumber: 1 })).toBe('a_b__c_d');
+		expect(
+			repoSlug({ platform: 'github', host: 'github.com', owner: 'a/b', repo: 'c d', prNumber: 1 })
+		).toBe('a_b__c_d');
 	});
 });

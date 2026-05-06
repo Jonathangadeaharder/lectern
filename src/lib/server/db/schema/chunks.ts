@@ -1,6 +1,6 @@
-import { sqliteTable, text, integer, primaryKey, index } from 'drizzle-orm/sqlite-core';
-import { sessions } from './sessions';
+import { index, integer, primaryKey, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 import { bundles } from './bundles';
+import { sessions } from './sessions';
 
 /** Cached chunk sets per (bundle, head_sha). Pre-computed in #6. */
 export const chunkSets = sqliteTable(

@@ -3,6 +3,9 @@
 	"version": "0.1.0",
 	"private": true,
 	"type": "module",
+	"bin": {
+		"lectern": "bin/lectern.ts"
+	},
 	"description": "A guided reading companion for code review",
 	"packageManager": "pnpm@10.33.2",
 	"engines": {
@@ -26,6 +29,7 @@
 		"@ai-sdk/svelte": "^2.0.0",
 		"@octokit/rest": "^21.0.2",
 		"ai": "^4.0.0",
+		"argon2": "^0.44.0",
 		"better-sqlite3": "^11.3.0",
 		"drizzle-orm": "^0.36.0",
 		"env-paths": "^3.0.0",
@@ -63,11 +67,6 @@
 		"vitest": "^2.1.5"
 	},
 	"pnpm": {
-		"onlyBuiltDependencies": [
-			"@biomejs/biome",
-			"better-sqlite3",
-			"esbuild",
-			"keytar"
-		]
+		"onlyBuiltDependencies": ["@biomejs/biome", "better-sqlite3", "esbuild", "keytar", "argon2"]
 	}
 }

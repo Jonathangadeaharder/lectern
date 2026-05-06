@@ -1,5 +1,5 @@
-import parseDiff from 'parse-diff';
 import { createHash } from 'node:crypto';
+import parseDiff from 'parse-diff';
 import type { DiffLine, Hunk } from './types';
 
 export function parsePatchToHunks(patch: string): Hunk[] {
@@ -24,8 +24,7 @@ export function parsePatchToHunks(patch: string): Hunk[] {
 			let removed = 0;
 			const lines: DiffLine[] = [];
 			for (const change of h.changes ?? []) {
-				const type =
-					change.type === 'add' ? 'add' : change.type === 'del' ? 'del' : 'context';
+				const type = change.type === 'add' ? 'add' : change.type === 'del' ? 'del' : 'context';
 				if (type === 'add') added += 1;
 				if (type === 'del') removed += 1;
 				lines.push({

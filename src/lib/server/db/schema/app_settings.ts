@@ -1,4 +1,4 @@
-import { sqliteTable, text, integer } from 'drizzle-orm/sqlite-core';
+import { integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 
 /** Generic key-value bag. Used for `llm.quick_config` and similar. */
 export const appSettings = sqliteTable('app_settings', {

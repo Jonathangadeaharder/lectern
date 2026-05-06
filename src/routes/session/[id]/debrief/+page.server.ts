@@ -1,7 +1,7 @@
-import { error } from '@sveltejs/kit';
-import { eq } from 'drizzle-orm';
 import { getDb } from '$lib/server/db';
 import { sessions } from '$lib/server/db/schema';
+import { error } from '@sveltejs/kit';
+import { eq } from 'drizzle-orm';
 
 export async function load({ params }) {
 	const id = params.id;

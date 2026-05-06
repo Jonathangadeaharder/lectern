@@ -9,9 +9,7 @@ export function streamObjectToSSE<T>(
 		async start(controller) {
 			try {
 				for await (const partial of stream) {
-					controller.enqueue(
-						encoder.encode(`data: ${JSON.stringify({ partial })}\n\n`)
-					);
+					controller.enqueue(encoder.encode(`data: ${JSON.stringify({ partial })}\n\n`));
 				}
 				const final = await finalPromise;
 				controller.enqueue(encoder.encode(`event: done\ndata: ${JSON.stringify(final)}\n\n`));

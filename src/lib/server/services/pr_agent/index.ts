@@ -1,12 +1,12 @@
-import { execa } from 'execa';
+import { randomUUID } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { eq } from 'drizzle-orm';
+import { execa } from 'execa';
 import { z } from 'zod';
-import { randomUUID } from 'node:crypto';
 import { resolveDataDir } from '../../config/paths';
 import { getDb } from '../../db';
-import { prAgentRuns, bundles } from '../../db/schema';
+import { bundles, prAgentRuns } from '../../db/schema';
 import { getKey } from '../secrets/keychain';
 
 export class PrAgentSetupError extends Error {
@@ -64,10 +64,7 @@ export type PrAgentReview = z.infer<typeof PrAgentReviewSchema>;
 
 function venvPython(): string | null {
 	const venv = resolveDataDir().pythonVenv;
-	const candidates = [
-		join(venv, 'bin', 'python'),
-		join(venv, 'Scripts', 'python.exe')
-	];
+	const candidates = [join(venv, 'bin', 'python'), join(venv, 'Scripts', 'python.exe')];
 	return candidates.find((p) => existsSync(p)) ?? null;
 }
 
@@ -87,7 +84,13 @@ export async function runReview(opts: RunReviewOptions): Promise<PrAgentReview> 
 
 	const runId = randomUUID();
 	db.insert(prAgentRuns)
-		.values({ id: runId, bundleId: opts.bundleId, task: 'review', status: 'running', startedAt: Date.now() })
+		.values({
+			id: runId,
+			bundleId: opts.bundleId,
+			task: 'review',
+			status: 'running',
+			startedAt: Date.now()
+		})
 		.run();
 
 	const env: Record<string, string> = {};

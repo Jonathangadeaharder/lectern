@@ -1,6 +1,6 @@
-import envPaths from 'env-paths';
-import { existsSync, mkdirSync, chmodSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
+import envPaths from 'env-paths';
 
 export interface DataDirLayout {
 	root: string;
@@ -34,13 +34,7 @@ export function resolveDataDir(): DataDirLayout {
 }
 
 function ensureDirs(layout: DataDirLayout): void {
-	for (const path of [
-		layout.root,
-		layout.db,
-		layout.bundles,
-		layout.exports,
-		layout.logs
-	]) {
+	for (const path of [layout.root, layout.db, layout.bundles, layout.exports, layout.logs]) {
 		if (!existsSync(path)) {
 			mkdirSync(path, { recursive: true, mode: 0o700 });
 		} else {

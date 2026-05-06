@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Mock all dependencies
 vi.mock('../../db', () => ({
@@ -43,10 +43,16 @@ vi.mock('./github', () => ({
 			createdAt: '2024-01-01T00:00:00Z',
 			updatedAt: '2024-01-02T00:00:00Z'
 		}),
-		fetchDiff: vi.fn().mockResolvedValue('diff --git a/a.ts b/a.ts\n--- a/a.ts\n+++ b/a.ts\n@@ -1 +1,2 @@\n foo\n+bar\n'),
-		fetchCommits: vi.fn().mockResolvedValue([
-			{ sha: 'abc123', message: 'feat: add bar', author: 'testuser', date: '2024-01-01' }
-		]),
+		fetchDiff: vi
+			.fn()
+			.mockResolvedValue(
+				'diff --git a/a.ts b/a.ts\n--- a/a.ts\n+++ b/a.ts\n@@ -1 +1,2 @@\n foo\n+bar\n'
+			),
+		fetchCommits: vi
+			.fn()
+			.mockResolvedValue([
+				{ sha: 'abc123', message: 'feat: add bar', author: 'testuser', date: '2024-01-01' }
+			]),
 		fetchFile: vi.fn().mockResolvedValue({ content: Buffer.from('file content'), size: 12 })
 	}
 }));
@@ -78,7 +84,7 @@ vi.mock('parse-diff', () => ({
 	])
 }));
 
-import { ingestFromUrl, IngestionAuthError } from './index';
+import { IngestionAuthError, ingestFromUrl } from './index';
 
 describe('ingestFromUrl', () => {
 	it('is a function', () => {

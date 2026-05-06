@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { getTheme, toggleTheme } from '$lib/client/theme.svelte';
 
 	interface Status {
 		endpoint: string | null;
@@ -30,6 +31,20 @@
 		<h1 class="text-2xl font-semibold text-text-primary">Settings</h1>
 		<a href="/" class="text-sm text-text-muted hover:text-text-primary">← Home</a>
 	</header>
+
+	<section class="flex flex-col gap-3 rounded-md border border-border bg-surface-1 p-4">
+		<header>
+			<h2 class="text-base font-medium text-text-primary">Appearance</h2>
+			<p class="text-sm text-text-secondary">Toggle between dark and light themes.</p>
+		</header>
+		<button
+			type="button"
+			onclick={toggleTheme}
+			class="self-start rounded-md border border-border px-3 py-1.5 text-sm hover:bg-surface-2"
+		>
+			Switch to {getTheme() === 'dark' ? 'light' : 'dark'} mode
+		</button>
+	</section>
 
 	<section class="flex flex-col gap-3 rounded-md border border-border bg-surface-1 p-4">
 		<header>
@@ -81,6 +96,19 @@
 			class="self-start rounded-md border border-border px-3 py-1.5 text-sm hover:bg-surface-2"
 		>
 			Configure
+		</a>
+	</section>
+
+	<section class="flex flex-col gap-3 rounded-md border border-border bg-surface-1 p-4">
+		<header>
+			<h2 class="text-base font-medium text-text-primary">Data &amp; Keys</h2>
+			<p class="text-sm text-text-secondary">Clear session data or remove stored API keys.</p>
+		</header>
+		<a
+			href="/settings/data"
+			class="self-start rounded-md border border-border px-3 py-1.5 text-sm hover:bg-surface-2"
+		>
+			Manage
 		</a>
 	</section>
 </main>

@@ -1,4 +1,4 @@
-import { sqliteTable, text, integer } from 'drizzle-orm/sqlite-core';
+import { integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 import { bundles } from './bundles';
 
 export const prAgentRuns = sqliteTable('pr_agent_runs', {

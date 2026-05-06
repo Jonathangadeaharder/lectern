@@ -1,6 +1,6 @@
+import { getRepoProfileData } from '$lib/server/services/dashboard';
 import { error } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
-import { getRepoProfileData } from '$lib/server/services/dashboard';
 
 export const load: PageServerLoad = async ({ params }) => {
 	const slug = params.slug;

@@ -48,7 +48,7 @@ export function buildUser(input: QuestionGenInput): string {
 		input.diff,
 		'```',
 		'',
-		samples ? '## Head file samples\n```\n' + samples + '\n```' : '',
+		samples ? `## Head file samples\n\`\`\`\n${samples}\n\`\`\`` : '',
 		'',
 		`Generate questions for chunk id "${input.chunkId}". Return JSON: { "questions": [...] }.`
 	]

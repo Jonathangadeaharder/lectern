@@ -7,6 +7,8 @@ import * as schema from './schema';
 let _db: ReturnType<typeof drizzle<typeof schema>> | null = null;
 let _sqlite: Database.Database | null = null;
 
+let _migrated = false;
+
 export function getDb() {
 	if (_db) return _db;
 
@@ -18,6 +20,12 @@ export function getDb() {
 	_sqlite.pragma('secure_delete = ON');
 
 	_db = drizzle(_sqlite, { schema });
+
+	if (!_migrated) {
+		_migrated = true;
+		runMigrations('./drizzle');
+	}
+
 	return _db;
 }
 

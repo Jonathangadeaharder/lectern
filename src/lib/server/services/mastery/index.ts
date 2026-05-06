@@ -1,7 +1,7 @@
-import { eq, and } from 'drizzle-orm';
 import { randomUUID } from 'node:crypto';
+import { and, eq } from 'drizzle-orm';
 import { getDb } from '../../db';
-import { skillMastery, sessionQuestions, answers } from '../../db/schema';
+import { answers, sessionQuestions, skillMastery } from '../../db/schema';
 
 const EWMA_ALPHA = 0.3;
 const DECAY_RATE_PER_DAY = 0.02;
@@ -41,7 +41,7 @@ export function classifyLevel(score: number): MasteryLevel {
 
 export function decayScore(score: number, daysSinceLast: number): number {
 	if (daysSinceLast <= 0) return score;
-	return score * Math.pow(1 - DECAY_RATE_PER_DAY, daysSinceLast);
+	return score * (1 - DECAY_RATE_PER_DAY) ** daysSinceLast;
 }
 
 export function updateMastery(params: {
@@ -57,9 +57,7 @@ export function updateMastery(params: {
 	const existing = db
 		.select()
 		.from(skillMastery)
-		.where(
-			and(eq(skillMastery.tag, params.tag), eq(skillMastery.repoSlug, repoSlug ?? ''))
-		)
+		.where(and(eq(skillMastery.tag, params.tag), eq(skillMastery.repoSlug, repoSlug ?? '')))
 		.get();
 
 	if (existing) {
@@ -164,9 +162,7 @@ export function getMasteryForTag(tag: string, repoSlug?: string | null): SkillMa
 	const row = db
 		.select()
 		.from(skillMastery)
-		.where(
-			and(eq(skillMastery.tag, tag), eq(skillMastery.repoSlug, repoSlug ?? ''))
-		)
+		.where(and(eq(skillMastery.tag, tag), eq(skillMastery.repoSlug, repoSlug ?? '')))
 		.get();
 	return (row as SkillMasteryRow) ?? null;
 }
@@ -183,11 +179,7 @@ export function updateMasteryFromSession(
 		.where(eq(sessionQuestions.sessionId, sessionId))
 		.all();
 
-	const aRows = db
-		.select()
-		.from(answers)
-		.where(eq(answers.sessionId, sessionId))
-		.all();
+	const aRows = db.select().from(answers).where(eq(answers.sessionId, sessionId)).all();
 
 	const answerByQId = new Map(aRows.map((a) => [a.questionId, a]));
 	const updated: SkillMasteryRow[] = [];

@@ -1,8 +1,8 @@
 import { generateText } from 'ai';
 import { z } from 'zod';
-import { buildModelFromValues } from './provider';
+import { isHostAllowed, permitHost } from '../net/fetch';
 import { LlmAuthError, LlmProviderError } from './errors';
-import { permitHost, isHostAllowed } from '../net/fetch';
+import { buildModelFromValues } from './provider';
 
 export const TestConnectionRequestSchema = z.object({
 	endpoint: z.string().url(),
