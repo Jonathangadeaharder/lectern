@@ -1,7 +1,9 @@
 import { eq } from 'drizzle-orm';
 import { randomUUID } from 'node:crypto';
+import { readFileSync, existsSync } from 'node:fs';
+import { join } from 'node:path';
 import { getDb } from '../../db';
-import { bugCommits, bugPatterns } from '../../db/schema';
+import { bugCommits, bugPatterns, repoScanState } from '../../db/schema';
 import type { ConventionSource } from '../repo_memory';
 
 const BUG_FIX_PATTERNS = [
@@ -224,4 +226,208 @@ export function getBugPatterns(repoSlug: string): BugPatternRow[] {
 		.from(bugPatterns)
 		.where(eq(bugPatterns.repoSlug, repoSlug))
 		.all() as BugPatternRow[];
+}
+
+export interface AiTypicalPattern {
+	id: string;
+	summary: string;
+	description: string;
+	rootCause: string;
+	fileGlobs: string[];
+	confidence: number;
+}
+
+export function loadAiTypicalCatalog(): AiTypicalPattern[] {
+	const candidates = [
+		join(process.cwd(), 'data', 'ai_typical_catalog.yaml'),
+		join(import.meta.dirname ?? '.', '..', '..', '..', '..', '..', 'data', 'ai_typical_catalog.yaml')
+	];
+
+	for (const path of candidates) {
+		if (!existsSync(path)) continue;
+		try {
+			const raw = readFileSync(path, 'utf8');
+			return parseYamlCatalog(raw);
+		} catch {
+			continue;
+		}
+	}
+	return [];
+}
+
+function parseYamlCatalog(raw: string): AiTypicalPattern[] {
+	const patterns: AiTypicalPattern[] = [];
+	const patternBlocks = raw.split(/^\s*-\s+id:\s*/m).slice(1);
+
+	for (const block of patternBlocks) {
+		const id = block.match(/^\S+/)?.[0] ?? '';
+		const summary = block.match(/summary:\s*"([^"]*)"/)?.[1] ?? block.match(/summary:\s*'([^']*)'/)?.[1] ?? block.match(/summary:\s*(.+)$/m)?.[1]?.trim() ?? '';
+		const description = block.match(/description:\s*"([^"]*)"/)?.[1] ?? block.match(/description:\s*'([^']*)'/)?.[1] ?? block.match(/description:\s*(.+)$/m)?.[1]?.trim() ?? '';
+		const rootCause = block.match(/root_cause:\s*"([^"]*)"/)?.[1] ?? block.match(/root_cause:\s*'([^']*)'/)?.[1] ?? block.match(/root_cause:\s*(.+)$/m)?.[1]?.trim() ?? '';
+		const confidence = parseFloat(block.match(/confidence:\s*([\d.]+)/)?.[1] ?? '0.5');
+
+		const fileGlobs: string[] = [];
+		const globBlock = block.match(/file_globs:\s*\n((?:\s+-\s+.*\n?)*)/);
+		if (globBlock) {
+			for (const line of globBlock[1]!.split('\n')) {
+				const m = line.match(/^\s+-\s+"?([^"\n]+)"?/);
+				if (m) fileGlobs.push(m[1]!.trim());
+			}
+		}
+
+		patterns.push({ id, summary, description, rootCause, fileGlobs, confidence });
+	}
+
+	return patterns;
+}
+
+export function ingestAiTypicalPatterns(repoSlug: string): BugPatternRow[] {
+	const catalog = loadAiTypicalCatalog();
+	const db = getDb();
+	const now = Date.now();
+	const results: BugPatternRow[] = [];
+
+	for (const p of catalog) {
+		const existing = db
+			.select()
+			.from(bugPatterns)
+			.where(eq(bugPatterns.repoSlug, repoSlug))
+			.all()
+			.find((row) => row.summary === p.summary);
+
+		if (existing) {
+			results.push(existing as BugPatternRow);
+			continue;
+		}
+
+		const row: BugPatternRow = {
+			id: randomUUID(),
+			repoSlug,
+			summary: p.summary,
+			rootCause: p.rootCause || null,
+			fixPattern: null,
+			fileGlobsJson: JSON.stringify(p.fileGlobs),
+			frequency: 0,
+			confidence: p.confidence,
+			lastSeenAt: now,
+			createdAt: now
+		};
+		db.insert(bugPatterns).values(row).run();
+		results.push(row);
+	}
+
+	return results;
+}
+
+function globToRe(glob: string): RegExp {
+	const pattern = glob
+		.replace(/[.+^${}()|[\]\\]/g, '\\$&')
+		.replace(/\*\*/g, '{{GLOBSTAR}}')
+		.replace(/\*/g, '[^/]*')
+		.replace(/{{GLOBSTAR}}/g, '.*')
+		.replace(/\?/g, '[^/]');
+	return new RegExp(`^${pattern}$`);
+}
+
+export function matchPatternsToChunk(
+	repoSlug: string,
+	chunkFilePaths: string[]
+): Array<{ pattern: BugPatternRow; matchedFiles: string[] }> {
+	const db = getDb();
+	const patterns = db
+		.select()
+		.from(bugPatterns)
+		.where(eq(bugPatterns.repoSlug, repoSlug))
+		.all() as BugPatternRow[];
+
+	const results: Array<{ pattern: BugPatternRow; matchedFiles: string[] }> = [];
+
+	for (const pattern of patterns) {
+		const globs = JSON.parse(pattern.fileGlobsJson) as string[];
+		const regexes = globs.map(globToRe);
+		const matchedFiles = chunkFilePaths.filter((fp) =>
+			regexes.some((re) => re.test(fp))
+		);
+		if (matchedFiles.length > 0) {
+			results.push({ pattern, matchedFiles });
+		}
+	}
+
+	return results;
+}
+
+export interface ScanStateRow {
+	repoSlug: string;
+	lastScannedSha: string;
+	lastScannedAt: number;
+	totalCommitsScanned: number;
+}
+
+export function getScanState(repoSlug: string): ScanStateRow | null {
+	const db = getDb();
+	const row = db
+		.select()
+		.from(repoScanState)
+		.where(eq(repoScanState.repoSlug, repoSlug))
+		.get();
+	return (row as ScanStateRow) ?? null;
+}
+
+export function updateScanState(repoSlug: string, sha: string, scannedCount: number): ScanStateRow {
+	const db = getDb();
+	const now = Date.now();
+	const existing = getScanState(repoSlug);
+
+	if (existing) {
+		db.update(repoScanState)
+			.set({
+				lastScannedSha: sha,
+				lastScannedAt: now,
+				totalCommitsScanned: existing.totalCommitsScanned + scannedCount
+			})
+			.where(eq(repoScanState.repoSlug, repoSlug))
+			.run();
+		return {
+			repoSlug,
+			lastScannedSha: sha,
+			lastScannedAt: now,
+			totalCommitsScanned: existing.totalCommitsScanned + scannedCount
+		};
+	}
+
+	const row: ScanStateRow = {
+		repoSlug,
+		lastScannedSha: sha,
+		lastScannedAt: now,
+		totalCommitsScanned: scannedCount
+	};
+	db.insert(repoScanState).values(row).run();
+	return row;
+}
+
+export function ingestCommitsIncremental(
+	repoSlug: string,
+	commits: Array<{ sha: string; message: string }>,
+	sinceSha?: string
+): BugCommitRow[] {
+	const state = getScanState(repoSlug);
+	const cutoffSha = sinceSha ?? state?.lastScannedSha;
+
+	let toProcess = commits;
+	if (cutoffSha) {
+		const idx = commits.findIndex((c) => c.sha === cutoffSha);
+		if (idx >= 0) {
+			toProcess = commits.slice(0, idx);
+		}
+	}
+
+	if (toProcess.length === 0) return [];
+
+	const results = toProcess.map((c) => ingestCommit({ repoSlug, ...c }));
+
+	if (toProcess.length > 0) {
+		updateScanState(repoSlug, toProcess[0]!.sha, toProcess.length);
+	}
+
+	return results;
 }

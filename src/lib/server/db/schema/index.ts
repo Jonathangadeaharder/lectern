@@ -11,3 +11,4 @@ export * from './mastery';
 export * from './repo_conventions';
 export * from './bug_patterns';
 export * from './session_activity';
+export * from './repo_scan_state';

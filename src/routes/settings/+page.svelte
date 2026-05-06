@@ -9,6 +9,8 @@
 
 	let status = $state<Status | null>(null);
 	let loading = $state(true);
+	let resetting = $state(false);
+	let resetResult = $state<string | null>(null);
 
 	onMount(async () => {
 		await refresh();
@@ -21,6 +23,24 @@
 			if (res.ok) status = await res.json();
 		} finally {
 			loading = false;
+		}
+	}
+
+	async function resetAllMastery(): Promise<void> {
+		resetting = true;
+		resetResult = null;
+		try {
+			const res = await fetch('/api/mastery/reset', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+			if (res.ok) {
+				const data = await res.json();
+				resetResult = `Reset ${data.reset} skill(s).`;
+			} else {
+				resetResult = 'Reset failed.';
+			}
+		} catch {
+			resetResult = 'Reset failed.';
+		} finally {
+			resetting = false;
 		}
 	}
 </script>
@@ -82,5 +102,22 @@
 		>
 			Configure
 		</a>
+	</section>
+
+	<section class="flex flex-col gap-3 rounded-md border border-border bg-surface-1 p-4">
+		<header>
+			<h2 class="text-base font-medium text-text-primary">Mastery</h2>
+			<p class="text-sm text-text-secondary">Reset all skill mastery scores to initial state.</p>
+		</header>
+		<button
+			onclick={resetAllMastery}
+			disabled={resetting}
+			class="self-start rounded-md border border-red-300 px-3 py-1.5 text-sm text-red-600 hover:bg-red-50 disabled:opacity-50"
+		>
+			{resetting ? 'Resetting…' : 'Reset All Mastery'}
+		</button>
+		{#if resetResult}
+			<p class="text-sm text-text-secondary">{resetResult}</p>
+		{/if}
 	</section>
 </main>

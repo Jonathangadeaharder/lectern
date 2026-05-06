@@ -10,7 +10,8 @@ import {
 	skillMastery,
 	debriefs,
 	repoWeakSpots,
-	repoConventions
+	repoConventions,
+	masteryHistory
 } from '../../db/schema';
 import { getMasteryByTag, type SkillMasteryRow } from '../mastery';
 import { getBugPatterns, type BugPatternRow } from '../bug_mining';
@@ -169,7 +170,16 @@ export function getDashboardData(days = 90): DashboardData {
 }
 
 function buildTrend(mastery: SkillMasteryRow): number[] {
-	return [mastery.ewmaScore];
+	const db = getDb();
+	const rows = db
+		.select()
+		.from(masteryHistory)
+		.all()
+		.filter((h) => h.tag === mastery.tag && (h.repoSlug ?? '') === (mastery.repoSlug ?? ''))
+		.sort((a, b) => a.createdAt - b.createdAt)
+		.slice(-30);
+	if (rows.length === 0) return [mastery.ewmaScore];
+	return rows.map((r) => r.ewmaScore);
 }
 
 function buildCalibration(): CalibrationPoint[] {

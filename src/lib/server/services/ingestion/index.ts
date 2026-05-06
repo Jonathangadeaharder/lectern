@@ -6,12 +6,13 @@ import { bundles } from '../../db/schema';
 import { isBinary } from './binary';
 import { writeBundle, bundlePath as bundleFilePath } from './bundle';
 import { githubClient } from './github';
+import { gitlabClient } from './gitlab';
 import type { BundleFileEntry, BundleManifest, IngestProgressEvent, PlatformClient } from './types';
 import { parsePrUrl, repoSlug, type ParsedPrUrl } from './url';
 
 export class IngestionAuthError extends Error {
 	constructor(public readonly platform: 'github' | 'gitlab') {
-		super(`Authentication required for ${platform}.`);
+		super(`Authentication required. Add a source token in Settings.`);
 		this.name = 'IngestionAuthError';
 	}
 }
@@ -23,7 +24,8 @@ export interface IngestOptions {
 
 function clientFor(platform: 'github' | 'gitlab'): PlatformClient {
 	if (platform === 'github') return githubClient;
-	throw new Error(`gitlab.com client deferred to v1.1`);
+	if (platform === 'gitlab') return gitlabClient;
+	throw new Error(`unsupported platform: ${platform}`);
 }
 
 export async function ingestFromUrl(url: string, opts: IngestOptions = {}): Promise<{ id: string; filePath: string; sizeBytes: number }> {
@@ -152,7 +154,7 @@ export async function ingestFromUrl(url: string, opts: IngestOptions = {}): Prom
 	} catch (e) {
 		const status = (e as { status?: number }).status;
 		if (status === 401 || status === 403) {
-			emit({ step: 'error', kind: 'auth', message: 'Authentication required.' });
+			emit({ step: 'error', kind: 'auth', message: 'Authentication required. Add a source token in Settings.' });
 			throw new IngestionAuthError(parsed.platform);
 		}
 		emit({

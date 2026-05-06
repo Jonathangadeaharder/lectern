@@ -29,4 +29,7 @@ export interface Chunk {
 	estimatedMinutes: number;
 	primaryFiles: string[];
 	tags: ('test' | 'impl')[];
+	complexity: number;
+	languages: string[];
+	modules: string[];
 }
