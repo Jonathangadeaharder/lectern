@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { emit } from '$lib/client/sound/events';
 
 	let { data } = $props();
 
@@ -33,6 +34,7 @@
 	let loading = $state(true);
 
 	onMount(async () => {
+		emit('session_debrief');
 		try {
 			const res = await fetch(`/api/sessions/${data.sessionId}/debrief`);
 			if (res.ok) debrief = await res.json();
