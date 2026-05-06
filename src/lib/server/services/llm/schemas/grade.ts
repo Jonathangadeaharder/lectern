@@ -12,7 +12,7 @@ export const DisqualifierResultSchema = z.object({
 	justification: z.string().min(1)
 });
 
-export const VerdictSchema = z.enum(['pass', 'fail', 'borderline', 'review_needed']);
+export const VerdictSchema = z.enum(['pass', 'fail', 'borderline', 'review_needed', 'skipped']);
 
 export const GradingResultSchema = z.object({
 	requiredResults: z.array(PointResultSchema),
