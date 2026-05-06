@@ -70,4 +70,17 @@
 			</div>
 		{/if}
 	</section>
+
+	<section class="flex flex-col gap-3 rounded-md border border-border bg-surface-1 p-4">
+		<header>
+			<h2 class="text-base font-medium text-text-primary">Sound</h2>
+			<p class="text-sm text-text-secondary">Audio feedback during sessions.</p>
+		</header>
+		<a
+			href="/settings/sound"
+			class="self-start rounded-md border border-border px-3 py-1.5 text-sm hover:bg-surface-2"
+		>
+			Configure
+		</a>
+	</section>
 </main>
