@@ -7,8 +7,10 @@
  *  - Everything else, including `/session/[id]/debrief`, gets the shell.
  */
 export function useShell(pathname: string): boolean {
-	const inSessionRun = pathname.startsWith('/session/') && !pathname.endsWith('/debrief');
-	const inOnboarding = pathname.startsWith('/onboarding');
+	const normalized = pathname.replace(/\/+$/, '') || '/';
+	const segments = normalized.split('/').filter(Boolean);
+	const inSessionRun = segments[0] === 'session' && segments.length >= 2 && segments[2] !== 'debrief';
+	const inOnboarding = segments[0] === 'onboarding';
 	return !inSessionRun && !inOnboarding;
 }
 

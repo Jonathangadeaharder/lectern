@@ -574,7 +574,7 @@
 				class="btn btn-sm"
 			>Next →</button>
 			<span class="foot-hint">
-				<span class="kbd">⏎</span> submit · <span class="kbd">→</span> next chunk
+				<span class="kbd">⏎</span> submit · <span class="kbd">H</span>/<span class="kbd">L</span> prev/next chunk
 			</span>
 		</div>
 		<div class="foot-group">

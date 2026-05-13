@@ -5,12 +5,31 @@
 
 	let configured = $state(false);
 	let loading = $state(true);
+	let prUrl = $state('');
+	let formEl: HTMLFormElement | null = $state(null);
 
 	const samples = [
-		{ label: 'vercel/next.js #61204', tag: 'RSC' },
-		{ label: 'sveltejs/kit #11823', tag: 'auth' },
-		{ label: 'drizzle-orm #2913', tag: 'concurrency' }
+		{
+			label: 'vercel/next.js #61204',
+			tag: 'RSC',
+			url: 'https://github.com/vercel/next.js/pull/61204'
+		},
+		{
+			label: 'sveltejs/kit #11823',
+			tag: 'auth',
+			url: 'https://github.com/sveltejs/kit/pull/11823'
+		},
+		{
+			label: 'drizzle-orm #2913',
+			tag: 'concurrency',
+			url: 'https://github.com/drizzle-team/drizzle-orm/pull/2913'
+		}
 	];
+
+	function trySample(url: string) {
+		prUrl = url;
+		setTimeout(() => formEl?.requestSubmit());
+	}
 
 	onMount(async () => {
 		try {
@@ -56,11 +75,12 @@
 			</a>
 		</div>
 	{:else}
-		<form method="POST" action="/api/sessions/create" class="pr-input">
+		<form bind:this={formEl} method="POST" action="/api/sessions/create" class="pr-input">
 			<Icon name="pull-request" size={16} color="hsl(var(--text-muted))" />
 			<input
-				type="text"
+				type="url"
 				name="url"
+				bind:value={prUrl}
 				placeholder="https://github.com/drizzle-team/drizzle-orm/pull/2913"
 				aria-label="Pull request URL"
 			/>
@@ -72,7 +92,7 @@
 		<div class="samples">
 			<span class="muted small">or try</span>
 			{#each samples as s (s.label)}
-				<button type="button" class="sample">
+				<button type="button" class="sample" onclick={() => trySample(s.url)}>
 					<span>{s.label}</span>
 					<span class="sample-tag">{s.tag}</span>
 				</button>
@@ -109,7 +129,7 @@
 	.halo {
 		position: relative;
 		margin-bottom: 30px;
-		animation: fadeUp 600ms var(--ease-out);
+		animation: fade-up 600ms var(--ease-out);
 	}
 	.halo::before {
 		content: '';
@@ -128,7 +148,7 @@
 		margin: 0;
 		max-width: 720px;
 		letter-spacing: -0.025em;
-		animation: fadeUp 700ms var(--ease-out) 80ms both;
+		animation: fade-up 700ms var(--ease-out) 80ms both;
 	}
 	.muted {
 		color: hsl(var(--text-muted));
@@ -139,11 +159,11 @@
 		font-size: 15px;
 		color: hsl(var(--text-secondary));
 		line-height: 1.55;
-		animation: fadeUp 700ms var(--ease-out) 160ms both;
+		animation: fade-up 700ms var(--ease-out) 160ms both;
 	}
 	.cta-wrap {
 		margin-top: 32px;
-		animation: fadeUp 700ms var(--ease-out) 240ms both;
+		animation: fade-up 700ms var(--ease-out) 240ms both;
 	}
 	.cta {
 		min-height: 44px;
@@ -159,7 +179,7 @@
 		background: hsl(var(--surface-1));
 		border: 1px solid hsl(var(--border-default));
 		border-radius: 10px;
-		animation: fadeUp 700ms var(--ease-out) 240ms both;
+		animation: fade-up 700ms var(--ease-out) 240ms both;
 	}
 	.pr-input input {
 		flex: 1;
@@ -180,7 +200,7 @@
 		flex-wrap: wrap;
 		gap: 8px;
 		justify-content: center;
-		animation: fadeUp 700ms var(--ease-out) 280ms both;
+		animation: fade-up 700ms var(--ease-out) 280ms both;
 	}
 	.small {
 		font-size: 11px;
@@ -216,7 +236,7 @@
 		justify-content: center;
 		font-size: 12px;
 		color: hsl(var(--text-muted));
-		animation: fadeUp 700ms var(--ease-out) 320ms both;
+		animation: fade-up 700ms var(--ease-out) 320ms both;
 	}
 	.feature {
 		display: flex;
