@@ -51,8 +51,26 @@ export const QuestionSchema = z.object({
 	})
 });
 
+function inferFormat(q: Record<string, unknown>): string | undefined {
+	if (typeof q.format === 'string' && q.format) return q.format;
+	if (Array.isArray(q.options) && q.options.length > 0) return 'multiple_choice';
+	if (typeof q.correctAnswer === 'boolean') return 'true_false';
+	if (typeof q.originalCode === 'string' && typeof q.expectedCode === 'string') return 'code_fix';
+	if (Array.isArray(q.expectedLines) && q.expectedLines.length > 0) return 'click_lines';
+	if (q.rubric && typeof q.rubric === 'object') return 'free_text';
+	return undefined;
+}
+
+const QuestionInputSchema = z.preprocess((raw) => {
+	if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return raw;
+	const q = { ...(raw as Record<string, unknown>) };
+	const fmt = inferFormat(q);
+	if (fmt) q.format = fmt;
+	return q;
+}, QuestionSchema);
+
 export const QuestionListSchema = z.object({
-	questions: z.array(QuestionSchema).min(1).max(6)
+	questions: z.array(QuestionInputSchema).min(1).max(6)
 });
 
 export type QuestionFormat = z.infer<typeof QuestionFormatSchema>;

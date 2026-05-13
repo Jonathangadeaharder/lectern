@@ -2,9 +2,10 @@ import { and, eq } from 'drizzle-orm';
 import { getDb } from '../../db';
 import { chunkSets } from '../../db/schema';
 import { getBundlePath } from '../ingestion';
-import { readBundleDiff, readBundleManifest } from '../ingestion/bundle';
+import { readBundleDiff, readBundleEntry, readBundleManifest } from '../ingestion/bundle';
 import { parsePatchToHunks } from './diff';
 import { groupHunksToChunks } from './group';
+import { annotateMovedHunks, type CandidateFile } from './moved';
 import { generateChunkTitles } from './titles';
 import type { Chunk } from './types';
 
@@ -32,6 +33,10 @@ export async function chunkBundle(
 	if (!diff) return [];
 
 	const hunks = parsePatchToHunks(diff);
+
+	const candidates = await loadCandidateFiles(filePath, manifest, hunks);
+	annotateMovedHunks(hunks, candidates);
+
 	const chunks = groupHunksToChunks(hunks);
 	const titled = await generateChunkTitles(chunks, opts.signal);
 
@@ -50,6 +55,28 @@ export async function chunkBundle(
 		.run();
 
 	return titled;
+}
+
+const MAX_CANDIDATE_BYTES = 5 * 1024 * 1024;
+
+async function loadCandidateFiles(
+	bundleFile: string,
+	manifest: Awaited<ReturnType<typeof readBundleManifest>>,
+	_hunks: Array<{ file: string }>
+): Promise<CandidateFile[]> {
+	if (!manifest) return [];
+	const result: CandidateFile[] = [];
+	let totalBytes = 0;
+
+	for (const entry of manifest.files) {
+		if (entry.binary || entry.baseSize === 0) continue;
+		if (totalBytes + entry.baseSize > MAX_CANDIDATE_BYTES) break;
+		const buf = await readBundleEntry(bundleFile, `files/base/${entry.path}`);
+		if (!buf) continue;
+		result.push({ path: entry.path, content: buf.toString('utf8') });
+		totalBytes += entry.baseSize;
+	}
+	return result;
 }
 
 export type { Chunk } from './types';

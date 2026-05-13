@@ -5,11 +5,24 @@
 		expectedLines?: Array<{ file: string; line: number }>;
 	}
 
+	interface DiffLine {
+		type: 'add' | 'del' | 'context';
+		content: string;
+	}
+
+	interface MovedFrom {
+		file: string;
+		startLine: number;
+		endLine: number;
+		matchRatio: number;
+	}
+
 	interface Hunk {
 		file: string;
 		oldStart: number;
 		newStart: number;
-		lines: Array<{ type: 'add' | 'del' | 'context'; content: string }>;
+		lines: DiffLine[];
+		movedFrom?: MovedFrom;
 	}
 
 	interface Props {
@@ -55,61 +68,105 @@
 	const expectedSet = $derived(
 		new Set((question.expectedLines ?? []).map((l) => key(l.file, l.line)))
 	);
+
+	// Compute new-file line numbers, accounting for del lines (which don't exist in HEAD).
+	type Numbered = { type: 'add' | 'del' | 'context'; content: string; newLine: number | null };
+	function numberHunkLines(h: Hunk): Numbered[] {
+		const out: Numbered[] = [];
+		let n = h.newStart;
+		for (const l of h.lines) {
+			if (l.type === 'del') {
+				out.push({ type: l.type, content: l.content, newLine: null });
+			} else {
+				out.push({ type: l.type, content: l.content, newLine: n });
+				n += 1;
+			}
+		}
+		return out;
+	}
+
+	function prefix(t: 'add' | 'del' | 'context'): string {
+		return t === 'add' ? '+ ' : t === 'del' ? '- ' : '  ';
+	}
+
+	// Group consecutive hunks of the same file under one header for less visual noise.
+	type FileGroup = { file: string; hunks: Hunk[] };
+	const fileGroups = $derived.by((): FileGroup[] => {
+		const groups: FileGroup[] = [];
+		for (const h of hunks) {
+			const last = groups[groups.length - 1];
+			if (last && last.file === h.file) last.hunks.push(h);
+			else groups.push({ file: h.file, hunks: [h] });
+		}
+		return groups;
+	});
+
+	function onKeydown(e: KeyboardEvent): void {
+		if (graded) return;
+		if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) submit();
+	}
 </script>
 
-<section class="flex flex-col gap-4" aria-live="polite">
-	<p class="text-text-primary">{question.prompt}</p>
-	<p class="text-xs text-text-muted">
-		Click lines that change behavior. ⌘↵ to submit.
-	</p>
+<svelte:window onkeydown={onKeydown} />
 
-	<div class="overflow-hidden rounded-md border border-border bg-surface-0 font-mono text-xs">
-		{#each hunks as h (h.file + ':' + h.newStart)}
-			<header class="border-b border-border-subtle bg-surface-1 px-3 py-1 text-text-muted">
-				{h.file}
-			</header>
-			<ol>
-				{#each h.lines as l, idx (idx)}
-					{@const lineNo = h.newStart + idx}
-					{@const k = key(h.file, lineNo)}
-					{@const isMarked = marked.has(k)}
-					{@const isExpected = graded && expectedSet.has(k)}
-					{@const isCorrect = graded && isMarked && isExpected}
-					{@const isWrong = graded && isMarked && !isExpected}
-					<li
-						class="flex border-l-2
-							{isCorrect ? 'border-state-success' : ''}
-							{isWrong ? 'border-state-error' : ''}
-							{!graded && isMarked ? 'border-accent' : ''}
-							{!isMarked && !graded ? 'border-transparent' : ''}
-							{graded && isExpected && !isMarked ? 'border-state-warning' : ''}"
-					>
-						<button
-							type="button"
-							onclick={() => toggle(h.file, lineNo)}
-							disabled={Boolean(graded)}
-							class="w-10 select-none border-r border-border-subtle px-2 py-0.5 text-right text-text-muted hover:bg-surface-2"
+<section class="cl-section" aria-live="polite">
+	<p class="cl-prompt">{question.prompt}</p>
+	<p class="cl-hint">Click line numbers to mark them. ⌘/Ctrl + Enter to submit.</p>
+
+	<div class="cl-diff">
+		{#each fileGroups as g (g.file)}
+			<header class="cl-file-header">{g.file}</header>
+			{#each g.hunks as h (h.file + ':' + h.newStart)}
+				<div class="cl-hunk-range">@@ -{h.oldStart} +{h.newStart} @@</div>
+				{#if h.movedFrom}
+					<div class="cl-moved-banner">
+						<span class="cl-arrow">↳</span>
+						<span>
+							Relocated from <span class="cl-mono">{h.movedFrom.file}</span> · L{h.movedFrom.startLine}–{h.movedFrom.endLine}
+						</span>
+					</div>
+				{/if}
+				<ol>
+					{#each numberHunkLines(h) as l, i (i)}
+						{@const k = l.newLine !== null ? key(h.file, l.newLine) : null}
+						{@const isMarked = k !== null && marked.has(k)}
+						{@const isExpected = graded && k !== null && expectedSet.has(k)}
+						{@const isCorrect = graded && isMarked && isExpected}
+						{@const isWrong = graded && isMarked && !isExpected}
+						{@const isMissed = graded && isExpected && !isMarked}
+						<li
+							class="cl-line"
+							class:cl-add={l.type === 'add' && !h.movedFrom}
+							class:cl-del={l.type === 'del'}
+							class:cl-moved={l.type === 'add' && !!h.movedFrom}
+							class:cl-marked={isMarked && !graded}
+							class:cl-correct={isCorrect}
+							class:cl-wrong={isWrong}
+							class:cl-missed={isMissed}
 						>
-							{lineNo}
-						</button>
-						<pre class="flex-1 whitespace-pre px-2 py-0.5 {l.type === 'add' ? 'bg-state-success-bg/20' : l.type === 'del' ? 'bg-state-error-bg/20' : ''}">{prefix(l.type)}{l.content}</pre>
-					</li>
-				{/each}
-			</ol>
+							<button
+								type="button"
+								onclick={() => l.newLine !== null && toggle(h.file, l.newLine)}
+								disabled={Boolean(graded) || l.newLine === null}
+								class="cl-gutter"
+								aria-label={l.newLine !== null ? `Mark line ${l.newLine}` : 'Deleted line'}
+							>
+								{l.newLine ?? ''}
+							</button>
+							<pre class="cl-text">{prefix(l.type)}{l.content}</pre>
+						</li>
+					{/each}
+				</ol>
+			{/each}
 		{/each}
 	</div>
 
 	{#if !graded}
-		<div class="flex items-center justify-between">
-			<span class="text-xs text-text-muted">{marked.size} marked</span>
-			<div class="flex gap-2">
+		<div class="cl-actions">
+			<span class="cl-count">{marked.size} marked</span>
+			<div class="cl-buttons">
 				{#if onskip}
-					<button
-						type="button"
-						onclick={onskip}
-						disabled={submitting}
-						class="rounded-md border border-border px-4 py-2 text-sm text-text-secondary hover:bg-surface-2 disabled:opacity-50"
-					>
+					<button type="button" onclick={onskip} disabled={submitting} class="cl-btn cl-btn-ghost">
 						Skip
 					</button>
 				{/if}
@@ -117,28 +174,211 @@
 					type="button"
 					onclick={submit}
 					disabled={submitting}
-					class="rounded-md bg-accent px-4 py-2 text-sm font-medium text-surface-0 hover:bg-accent-hover disabled:opacity-50"
+					class="cl-btn cl-btn-primary"
 				>
 					{submitting ? 'Submitting…' : 'Submit'}
 				</button>
 			</div>
 		</div>
 	{:else}
-		<div class="rounded-md border border-border-subtle bg-surface-1 p-3 text-sm">
-			<strong class="text-text-primary"
-				>Verdict: {graded.verdict ?? '—'}{typeof graded.rawScore === 'number'
+		<div class="cl-verdict">
+			<strong>
+				Verdict: {graded.verdict ?? '—'}{typeof graded.rawScore === 'number'
 					? ` (${graded.rawScore.toFixed(2)})`
-					: ''}</strong
-			>
+					: ''}
+			</strong>
 			{#if graded.feedback}
-				<p class="mt-1 text-text-secondary">{graded.feedback}</p>
+				<p>{graded.feedback}</p>
 			{/if}
 		</div>
 	{/if}
 </section>
 
-<script lang="ts" module>
-	function prefix(t: 'add' | 'del' | 'context'): string {
-		return t === 'add' ? '+ ' : t === 'del' ? '- ' : '  ';
+<style>
+	.cl-section {
+		display: flex;
+		flex-direction: column;
+		gap: 12px;
 	}
-</script>
+	.cl-prompt {
+		color: hsl(var(--text-primary));
+		font-size: 13px;
+		line-height: 1.5;
+	}
+	.cl-hint {
+		font-size: 11px;
+		color: hsl(var(--text-muted));
+	}
+	.cl-diff {
+		overflow: hidden;
+		border: 1px solid hsl(var(--border-subtle));
+		border-radius: 6px;
+		background: hsl(var(--surface-0));
+		font-family: var(--font-mono);
+		font-size: 12px;
+	}
+	.cl-file-header {
+		padding: 6px 12px;
+		background: hsl(var(--surface-2));
+		color: hsl(var(--text-secondary));
+		font-size: 11px;
+		border-bottom: 1px solid hsl(var(--border-subtle));
+	}
+	.cl-hunk-range {
+		padding: 2px 12px;
+		background: hsl(var(--surface-1));
+		color: hsl(var(--text-disabled));
+		font-size: 10px;
+		border-bottom: 1px solid hsl(var(--border-subtle));
+	}
+	.cl-moved-banner {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		padding: 4px 12px;
+		font-size: 11px;
+		color: hsl(var(--text-muted));
+		background: hsl(var(--state-info-bg) / 0.4);
+		border-left: 2px solid hsl(var(--state-info));
+		border-bottom: 1px solid hsl(var(--border-subtle));
+		font-family: var(--font-sans);
+	}
+	.cl-arrow {
+		color: hsl(var(--state-info));
+	}
+	.cl-mono {
+		font-family: var(--font-mono);
+		color: hsl(var(--text-secondary));
+	}
+	ol {
+		list-style: none;
+		margin: 0;
+		padding: 0;
+	}
+	.cl-line {
+		display: flex;
+		border-left: 2px solid transparent;
+	}
+	.cl-gutter {
+		flex: 0 0 auto;
+		width: 48px;
+		padding: 1px 8px;
+		text-align: right;
+		color: hsl(var(--text-disabled));
+		background: transparent;
+		border: none;
+		border-right: 1px solid hsl(var(--border-subtle));
+		font-family: var(--font-mono);
+		font-size: 11px;
+		cursor: pointer;
+		user-select: none;
+	}
+	.cl-gutter:hover:not(:disabled) {
+		background: hsl(var(--surface-2));
+		color: hsl(var(--text-primary));
+	}
+	.cl-gutter:disabled {
+		cursor: default;
+	}
+	.cl-text {
+		flex: 1;
+		margin: 0;
+		padding: 1px 10px;
+		white-space: pre;
+	}
+	.cl-add {
+		background: hsl(var(--state-success-bg));
+		border-left-color: hsl(var(--state-success));
+	}
+	.cl-add .cl-text {
+		color: hsl(var(--state-success));
+	}
+	.cl-del {
+		background: hsl(var(--state-error-bg));
+		border-left-color: hsl(var(--state-error));
+	}
+	.cl-del .cl-text {
+		color: hsl(var(--state-error));
+	}
+	.cl-moved {
+		background: hsl(var(--state-info-bg));
+		border-left-color: hsl(var(--state-info));
+	}
+	.cl-moved .cl-text {
+		color: hsl(var(--state-info));
+	}
+	.cl-marked {
+		outline: 1px solid hsl(var(--accent));
+		outline-offset: -1px;
+	}
+	.cl-marked .cl-gutter {
+		background: hsl(var(--accent) / 0.2);
+		color: hsl(var(--accent));
+		font-weight: 600;
+	}
+	.cl-correct .cl-gutter {
+		background: hsl(var(--state-success) / 0.25);
+		color: hsl(var(--state-success));
+	}
+	.cl-wrong .cl-gutter {
+		background: hsl(var(--state-error) / 0.25);
+		color: hsl(var(--state-error));
+	}
+	.cl-missed .cl-gutter {
+		background: hsl(var(--state-warning) / 0.25);
+		color: hsl(var(--state-warning));
+	}
+
+	.cl-actions {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+	}
+	.cl-count {
+		font-size: 11px;
+		color: hsl(var(--text-muted));
+		font-family: var(--font-mono);
+	}
+	.cl-buttons {
+		display: flex;
+		gap: 8px;
+	}
+	.cl-btn {
+		padding: 6px 14px;
+		border-radius: 4px;
+		font-size: 13px;
+		font-weight: 500;
+		border: 1px solid transparent;
+		cursor: pointer;
+	}
+	.cl-btn:disabled {
+		opacity: 0.5;
+		cursor: not-allowed;
+	}
+	.cl-btn-ghost {
+		background: transparent;
+		border-color: hsl(var(--border-default));
+		color: hsl(var(--text-secondary));
+	}
+	.cl-btn-ghost:hover:not(:disabled) {
+		background: hsl(var(--surface-2));
+	}
+	.cl-btn-primary {
+		background: hsl(var(--accent));
+		color: hsl(var(--surface-0));
+	}
+	.cl-btn-primary:hover:not(:disabled) {
+		background: hsl(var(--accent-hover));
+	}
+	.cl-verdict {
+		padding: 10px 12px;
+		background: hsl(var(--surface-1));
+		border: 1px solid hsl(var(--border-subtle));
+		border-radius: 6px;
+		font-size: 13px;
+	}
+	.cl-verdict p {
+		margin-top: 6px;
+		color: hsl(var(--text-secondary));
+	}
+</style>

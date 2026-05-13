@@ -18,7 +18,7 @@ export const RubricSchema = z.object({
 	referenceAnswer: z.string().min(1),
 	scoring: z.object({
 		passThreshold: z.number().min(0).max(1).default(0.7),
-		borderlineBand: z.tuple([z.number(), z.number()]).default([0.6, 0.7])
+		borderlineBand: z.array(z.number()).length(2).default([0.6, 0.7])
 	})
 });
 

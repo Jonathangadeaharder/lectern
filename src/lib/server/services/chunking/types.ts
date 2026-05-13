@@ -5,6 +5,13 @@ export interface DiffLine {
 	newLine?: number;
 }
 
+export interface MovedFrom {
+	file: string;
+	startLine: number;
+	endLine: number;
+	matchRatio: number;
+}
+
 export interface Hunk {
 	id: string;
 	file: string;
@@ -18,6 +25,7 @@ export interface Hunk {
 	binary: boolean;
 	addedLines: number;
 	removedLines: number;
+	movedFrom?: MovedFrom;
 }
 
 export interface Chunk {

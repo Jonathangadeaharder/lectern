@@ -36,7 +36,11 @@
 		if (res.ok) {
 			const body = await res.json();
 			presets = body.presets;
-			applyPreset('anthropic');
+			const defaultId: string =
+				typeof body.defaultId === 'string' && presets.some((p) => p.id === body.defaultId)
+					? body.defaultId
+					: (presets[0]?.id ?? 'anthropic');
+			applyPreset(defaultId);
 		}
 	});
 
@@ -157,10 +161,16 @@
 			type="password"
 			bind:value={token}
 			autocomplete="off"
+			placeholder="sk-… or {'{env:MY_API_KEY}'}"
 			class="rounded-md border border-border bg-surface-1 px-3 py-2 font-mono text-sm text-text-primary placeholder:text-text-muted focus:border-accent focus:outline-none"
 		/>
 		<p class="text-xs text-text-muted">
 			Stored in your OS keychain. Never leaves your machine. Never echoed back.
+		</p>
+		<p class="text-xs text-text-muted">
+			Prefer not to paste a secret? Enter <code class="rounded bg-surface-2 px-1 font-mono"
+				>{'{env:VAR_NAME}'}</code
+			> and Lectern will read the token from that environment variable at request time.
 		</p>
 	</div>
 

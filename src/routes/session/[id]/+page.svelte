@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onMount, onDestroy } from 'svelte';
+	import { browser } from '$app/environment';
 	import { goto } from '$app/navigation';
 	import MultipleChoice from '$lib/components/session/MultipleChoice.svelte';
 	import FreeText from '$lib/components/session/FreeText.svelte';
@@ -8,6 +9,7 @@
 	import CodeFix from '$lib/components/session/CodeFix.svelte';
 	import DiffViewer from '$lib/components/session/DiffViewer.svelte';
 	import CommandPalette from '$lib/components/session/CommandPalette.svelte';
+	import AskPopover from '$lib/components/session/AskPopover.svelte';
 	import { setEnabled, getEnabled } from '$lib/client/sound';
 	import { emit } from '$lib/client/sound/events';
 
@@ -38,6 +40,68 @@
 	let questions = $state<QuestionRow[]>([]);
 	let answers = $state<Answer[]>([]);
 	let loadingQuestions = $state(true);
+	let generation = $state<{ complete: boolean; chunksReady: number; chunksTotal: number }>({
+		complete: false,
+		chunksReady: 0,
+		chunksTotal: 0
+	});
+	let generationPoll: ReturnType<typeof setInterval> | null = null;
+	let sourceUrl = $state<string | null>(null);
+	let rerunning = $state(false);
+
+	async function rerun(): Promise<void> {
+		if (!sourceUrl || rerunning) return;
+		rerunning = true;
+		try {
+			const res = await fetch('/api/sessions/create', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ url: sourceUrl, force: true })
+			});
+			if (!res.ok) {
+				console.error('Re-run failed:', await res.text());
+				return;
+			}
+			const body = await res.json();
+			if (body.sessionId) await goto(`/session/${body.sessionId}`, { invalidateAll: true });
+		} catch (e) {
+			console.error('Re-run failed:', (e as Error).message);
+		} finally {
+			rerunning = false;
+		}
+	}
+	let askPopover = $state<{ snippet: string; file?: string; anchor: { x: number; y: number } } | null>(
+		null
+	);
+	let askMenu = $state<{ x: number; y: number; snippet: string; file?: string } | null>(null);
+
+	function onDiffContextMenu(e: MouseEvent): void {
+		if (!browser) return;
+		const sel = window.getSelection();
+		const text = sel?.toString() ?? '';
+		if (!text.trim()) return;
+		e.preventDefault();
+		askMenu = {
+			x: e.clientX,
+			y: e.clientY,
+			snippet: text,
+			file: currentChunk?.hunks?.[0]?.file
+		};
+	}
+
+	function openAsk(): void {
+		if (!askMenu) return;
+		askPopover = {
+			snippet: askMenu.snippet,
+			file: askMenu.file,
+			anchor: { x: Math.min(askMenu.x, window.innerWidth - 480), y: Math.min(askMenu.y, window.innerHeight - 300) }
+		};
+		askMenu = null;
+	}
+
+	function closeAskMenu(): void {
+		askMenu = null;
+	}
 	let paused = $state(false);
 	let paletteOpen = $state(false);
 	let showHelp = $state(false);
@@ -104,6 +168,8 @@
 
 	onDestroy(() => {
 		if (heartbeat) clearInterval(heartbeat);
+		if (generationPoll) clearInterval(generationPoll);
+		if (!browser) return;
 		document.removeEventListener('visibilitychange', onVisibility);
 		window.removeEventListener('beforeunload', onUnload);
 		window.removeEventListener('keydown', onKey);
@@ -118,6 +184,17 @@
 			questions = body.questions ?? [];
 			answers = body.answers ?? [];
 			session = body.session;
+			chunks = body.chunks ?? chunks;
+			generation = body.generation ?? generation;
+			sourceUrl = body.source?.url ?? sourceUrl;
+			if (browser) {
+				if (!generation.complete && !generationPoll) {
+					generationPoll = setInterval(refresh, 1500);
+				} else if (generation.complete && generationPoll) {
+					clearInterval(generationPoll);
+					generationPoll = null;
+				}
+			}
 		} finally {
 			loadingQuestions = false;
 		}
@@ -387,7 +464,7 @@
 	<title>Session {session.id.slice(0, 8)}</title>
 </svelte:head>
 
-<div class="grid h-screen grid-rows-[56px_1fr_56px]">
+<div class="session-shell">
 	<!-- Top progress strip -->
 	<header class="session-top">
 		<a href="/dashboard" class="brand-link">
@@ -418,6 +495,33 @@
 		</span>
 		<button
 			type="button"
+			onclick={rerun}
+			disabled={!sourceUrl || rerunning}
+			class="btn btn-sm btn-ghost rerun-btn"
+			title="Re-fetch diff and regenerate chunks + questions (bypasses cache)"
+			aria-label="Re-run for current HEAD"
+		>
+			<svg
+				width="14"
+				height="14"
+				viewBox="0 0 16 16"
+				fill="none"
+				stroke="currentColor"
+				stroke-width="1.6"
+				stroke-linecap="round"
+				stroke-linejoin="round"
+				aria-hidden="true"
+				class:spin={rerunning}
+			>
+				<path d="M2 8a6 6 0 0 1 10.2-4.2L14 5" />
+				<path d="M14 2v3h-3" />
+				<path d="M14 8a6 6 0 0 1-10.2 4.2L2 11" />
+				<path d="M2 14v-3h3" />
+			</svg>
+			<span class="rerun-label">{rerunning ? 'Re-running…' : 'Re-run'}</span>
+		</button>
+		<button
+			type="button"
 			onclick={() => (paletteOpen = true)}
 			class="btn btn-sm btn-ghost"
 			title="Command palette (⌘K)"
@@ -425,6 +529,21 @@
 			<span class="kbd">⌘</span><span class="kbd">K</span>
 		</button>
 	</header>
+
+	{#if !generation.complete && generation.chunksTotal > 0}
+		<div class="gen-banner" role="status" aria-live="polite">
+			<div class="gen-banner-text">
+				<span class="gen-spinner" aria-hidden="true"></span>
+				Generating questions… {generation.chunksReady} of {generation.chunksTotal} chunks ready
+			</div>
+			<div class="gen-progress" aria-hidden="true">
+				<div
+					class="gen-progress-fill"
+					style="width: {(generation.chunksReady / Math.max(1, generation.chunksTotal)) * 100}%"
+				></div>
+			</div>
+		</div>
+	{/if}
 
 	<!-- Body: 3-column layout -->
 	<main class="grid grid-cols-[240px_1fr_360px] divide-x divide-border overflow-hidden">
@@ -451,6 +570,7 @@
 		<section
 			class="diff-pane {focusedPanel === 'question' ? 'panel-focus' : ''}"
 			aria-label="Diff viewer"
+			oncontextmenu={onDiffContextMenu}
 		>
 			{#if currentChunk}
 				<div class="diff-pane-head">
@@ -557,6 +677,35 @@
 			{/if}
 		</aside>
 	</main>
+
+	{#if askMenu}
+		<div
+			class="ask-menu"
+			style="left: {askMenu.x}px; top: {askMenu.y}px"
+			role="menu"
+		>
+			<button type="button" onclick={openAsk}>Ask Lectern about this…</button>
+		</div>
+		<div
+			class="ask-menu-shield"
+			onclick={closeAskMenu}
+			oncontextmenu={(e) => {
+				e.preventDefault();
+				closeAskMenu();
+			}}
+			role="presentation"
+		></div>
+	{/if}
+
+	{#if askPopover}
+		<AskPopover
+			{sessionId}
+			snippet={askPopover.snippet}
+			file={askPopover.file}
+			anchor={askPopover.anchor}
+			onClose={() => (askPopover = null)}
+		/>
+	{/if}
 
 	<!-- Bottom navigator -->
 	<footer class="session-foot">
@@ -902,5 +1051,109 @@
 		color: hsl(var(--text-muted));
 		font-family: var(--font-mono);
 		margin-left: 8px;
+	}
+
+	.gen-banner {
+		display: flex;
+		align-items: center;
+		gap: 12px;
+		padding: 6px 16px;
+		background: hsl(var(--surface-1));
+		border-bottom: 1px solid hsl(var(--border));
+		font-size: 12px;
+		color: hsl(var(--text-secondary));
+	}
+	.gen-banner-text {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		flex-shrink: 0;
+	}
+	.gen-progress {
+		flex: 1;
+		height: 2px;
+		background: hsl(var(--surface-2));
+		border-radius: 1px;
+		overflow: hidden;
+	}
+	.gen-progress-fill {
+		height: 100%;
+		background: hsl(var(--accent));
+		transition: width 400ms ease;
+	}
+	.gen-spinner {
+		width: 10px;
+		height: 10px;
+		border: 1.5px solid hsl(var(--border));
+		border-top-color: hsl(var(--accent));
+		border-radius: 50%;
+		animation: gen-spin 800ms linear infinite;
+	}
+	@keyframes gen-spin {
+		to {
+			transform: rotate(360deg);
+		}
+	}
+
+	.ask-menu {
+		position: fixed;
+		z-index: 1001;
+		background: hsl(var(--surface-0));
+		border: 1px solid hsl(var(--border));
+		border-radius: 6px;
+		box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+		padding: 4px;
+		min-width: 200px;
+	}
+	.ask-menu button {
+		width: 100%;
+		text-align: left;
+		padding: 6px 10px;
+		background: none;
+		border: none;
+		color: hsl(var(--text-primary));
+		font-size: 13px;
+		cursor: pointer;
+		border-radius: 4px;
+	}
+	.ask-menu button:hover {
+		background: hsl(var(--surface-2));
+	}
+	.ask-menu-shield {
+		position: fixed;
+		inset: 0;
+		z-index: 1000;
+	}
+
+	.rerun-btn {
+		display: inline-flex;
+		align-items: center;
+		gap: 6px;
+	}
+	.rerun-label {
+		font-size: 12px;
+	}
+	.rerun-btn svg.spin {
+		animation: gen-spin 800ms linear infinite;
+	}
+
+	.session-shell {
+		display: flex;
+		flex-direction: column;
+		height: 100vh;
+		min-height: 0;
+	}
+	.session-shell > :global(header.session-top) {
+		flex: 0 0 56px;
+	}
+	.session-shell > :global(.gen-banner) {
+		flex: 0 0 auto;
+	}
+	.session-shell > :global(main) {
+		flex: 1 1 0;
+		min-height: 0;
+	}
+	.session-shell > :global(footer.session-foot) {
+		flex: 0 0 56px;
 	}
 </style>

@@ -35,6 +35,19 @@ describe('parsePrUrl', () => {
 		});
 	});
 
+	it('parses self-hosted GitLab with nested groups', () => {
+		const result = parsePrUrl(
+			'https://gitlab.example.com/group.a/group.b/sources/-/merge_requests/42'
+		);
+		expect(result).toEqual({
+			platform: 'gitlab',
+			host: 'gitlab.example.com',
+			owner: 'group.a/group.b',
+			repo: 'sources',
+			prNumber: 42
+		});
+	});
+
 	it('trims whitespace', () => {
 		const result = parsePrUrl('  https://github.com/o/r/pull/1  ');
 		expect(result.owner).toBe('o');

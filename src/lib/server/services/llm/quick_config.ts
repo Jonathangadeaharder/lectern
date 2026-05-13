@@ -85,3 +85,36 @@ export const PROVIDER_PRESETS: readonly ProviderPreset[] = [
 		model: ''
 	}
 ] as const;
+
+const ProviderPresetSchema = z.object({
+	id: z.string().min(1),
+	label: z.string().min(1),
+	endpoint: z.string(),
+	model: z.string(),
+	headers: z.record(z.string()).optional(),
+	help: z.string().optional()
+});
+
+function loadExtraPresets(): ProviderPreset[] {
+	const raw = process.env.LECTERN_EXTRA_PRESETS;
+	if (!raw) return [];
+	try {
+		const parsed = z.array(ProviderPresetSchema).parse(JSON.parse(raw));
+		return parsed;
+	} catch (e) {
+		console.warn('LECTERN_EXTRA_PRESETS is set but failed to parse:', (e as Error).message);
+		return [];
+	}
+}
+
+export function listPresets(): ProviderPreset[] {
+	const extras = loadExtraPresets();
+	const baseIds = new Set(extras.map((p) => p.id));
+	return [...extras, ...PROVIDER_PRESETS.filter((p) => !baseIds.has(p.id))];
+}
+
+export function defaultPresetId(): string {
+	const fromEnv = process.env.LECTERN_DEFAULT_PRESET?.trim();
+	if (fromEnv) return fromEnv;
+	return listPresets()[0]?.id ?? 'anthropic';
+}

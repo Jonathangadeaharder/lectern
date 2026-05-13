@@ -6,4 +6,5 @@ export type TaskName =
 	| 'preflight_summarize'
 	| 'chunk_titles'
 	| 'cumulative_summary'
-	| 'bug_pattern_extraction';
+	| 'bug_pattern_extraction'
+	| 'ask_about_selection';
