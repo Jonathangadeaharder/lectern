@@ -15,7 +15,7 @@
 
 	function scorePercent(score: number | null): string {
 		if (score === null) return '\u2014';
-		return `${Math.round(score * 100)}%`;
+		return `${toPct(score)}%`;
 	}
 
 	const levelColors: Record<string, string> = {

@@ -28,7 +28,7 @@
 
 	function trySample(url: string) {
 		prUrl = url;
-		formEl?.requestSubmit();
+		setTimeout(() => formEl?.requestSubmit());
 	}
 
 	onMount(async () => {
