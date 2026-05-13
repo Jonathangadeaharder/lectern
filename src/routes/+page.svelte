@@ -1,8 +1,16 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import Icon from '$lib/client/Icon.svelte';
+	import LecternMark from '$lib/client/LecternMark.svelte';
 
 	let configured = $state(false);
 	let loading = $state(true);
+
+	const samples = [
+		{ label: 'vercel/next.js #61204', tag: 'RSC' },
+		{ label: 'sveltejs/kit #11823', tag: 'auth' },
+		{ label: 'drizzle-orm #2913', tag: 'concurrency' }
+	];
 
 	onMount(async () => {
 		try {
@@ -17,54 +25,202 @@
 	});
 </script>
 
-<main class="mx-auto flex min-h-screen max-w-2xl flex-col gap-6 px-6 py-12">
-	<header class="flex flex-col gap-1">
-		<h1 class="text-3xl font-semibold text-text-primary">Lectern</h1>
-		<p class="text-text-secondary">
-			A guided reading companion for code review.
-		</p>
-	</header>
+<main class="stage">
+	<div class="halo">
+		<LecternMark size={56} />
+	</div>
+
+	<div class="eyebrow eyebrow-hero">Stand at the lectern</div>
+
+	<h1 class="display headline">
+		{#if !configured && !loading}
+			Set up Lectern.
+			<span class="muted"> Then drop a PR.</span>
+		{:else}
+			Drop a PR.
+			<span class="muted"> We'll quiz you on it.</span>
+		{/if}
+	</h1>
+
+	<p class="lede">
+		Lectern reads a Pull Request, splits it into logical chunks, and asks you questions until the
+		change is real in your head.
+	</p>
 
 	{#if loading}
-		<p class="text-text-muted">Loading…</p>
+		<p class="muted">Loading…</p>
 	{:else if !configured}
-		<section class="rounded-md border border-border bg-surface-1 p-6">
-			<h2 class="mb-2 text-lg font-medium text-text-primary">Set up your LLM</h2>
-			<p class="mb-4 text-text-secondary">
-				Lectern needs an LLM endpoint. Pick a provider, paste a token, you're done.
-			</p>
-			<a
-				href="/onboarding"
-				class="inline-flex items-center rounded-md bg-accent px-4 py-2 text-sm font-medium text-surface-0 transition hover:bg-accent-hover"
-			>
-				Continue to setup →
+		<div class="cta-wrap">
+			<a class="btn btn-primary btn-lg cta" href="/onboarding">
+				Continue to setup <Icon name="arrow-right" size={14} />
 			</a>
-		</section>
-		{:else}
-		<section class="flex flex-col gap-3">
-			<h2 class="text-lg font-medium text-text-primary">Start a review</h2>
-			<form method="POST" action="/api/sessions/create" class="flex gap-2">
-				<input
-					type="text"
-					name="url"
-					placeholder="https://github.com/owner/repo/pull/123"
-					class="flex-1 rounded-md border border-border bg-surface-1 px-3 py-2 text-text-primary placeholder:text-text-muted focus:border-accent focus:outline-none"
-				/>
-				<button
-					type="submit"
-					class="rounded-md bg-accent px-4 py-2 text-sm font-medium text-surface-0 hover:bg-accent-hover"
-				>
-					Ingest
+		</div>
+	{:else}
+		<form method="POST" action="/api/sessions/create" class="pr-input">
+			<Icon name="pull-request" size={16} color="hsl(var(--text-muted))" />
+			<input
+				type="text"
+				name="url"
+				placeholder="https://github.com/drizzle-team/drizzle-orm/pull/2913"
+				aria-label="Pull request URL"
+			/>
+			<button type="submit" class="btn btn-primary">
+				Ingest <Icon name="arrow-right" size={13} />
+			</button>
+		</form>
+
+		<div class="samples">
+			<span class="muted small">or try</span>
+			{#each samples as s (s.label)}
+				<button type="button" class="sample">
+					<span>{s.label}</span>
+					<span class="sample-tag">{s.tag}</span>
 				</button>
-			</form>
-			<div class="mt-4 flex gap-4">
-				<a class="text-sm text-text-muted hover:text-text-primary" href="/settings/keys">
-					Settings →
-				</a>
-				<a class="text-sm text-text-muted hover:text-text-primary" href="/dashboard">
-					Dashboard →
-				</a>
-			</div>
-		</section>
+			{/each}
+		</div>
 	{/if}
+
+	<div class="features">
+		<span class="feature">
+			<Icon name="zap" size={12} color="hsl(var(--accent))" />
+			Public & private repos
+		</span>
+		<span class="feature">
+			<Icon name="brain" size={12} color="hsl(var(--accent))" />
+			Grading is local-first
+		</span>
+		<span class="feature">
+			<Icon name="layers" size={12} color="hsl(var(--accent))" />
+			Avg session ~ 18 min
+		</span>
+	</div>
 </main>
+
+<style>
+	.stage {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+		min-height: 100%;
+		padding: 56px 48px 80px;
+		text-align: center;
+	}
+	.halo {
+		position: relative;
+		margin-bottom: 30px;
+		animation: fadeUp 600ms var(--ease-out);
+	}
+	.halo::before {
+		content: '';
+		position: absolute;
+		inset: -16px;
+		background: radial-gradient(circle, hsl(var(--accent) / 0.12), transparent 70%);
+		border-radius: 99px;
+		pointer-events: none;
+		z-index: -1;
+	}
+	.eyebrow-hero {
+		margin-bottom: 14px;
+	}
+	.headline {
+		font-size: 48px;
+		margin: 0;
+		max-width: 720px;
+		letter-spacing: -0.025em;
+		animation: fadeUp 700ms var(--ease-out) 80ms both;
+	}
+	.muted {
+		color: hsl(var(--text-muted));
+	}
+	.lede {
+		margin-top: 18px;
+		max-width: 540px;
+		font-size: 15px;
+		color: hsl(var(--text-secondary));
+		line-height: 1.55;
+		animation: fadeUp 700ms var(--ease-out) 160ms both;
+	}
+	.cta-wrap {
+		margin-top: 32px;
+		animation: fadeUp 700ms var(--ease-out) 240ms both;
+	}
+	.cta {
+		min-height: 44px;
+	}
+	.pr-input {
+		margin-top: 32px;
+		width: 100%;
+		max-width: 540px;
+		display: flex;
+		align-items: center;
+		gap: 10px;
+		padding: 4px 6px 4px 16px;
+		background: hsl(var(--surface-1));
+		border: 1px solid hsl(var(--border-default));
+		border-radius: 10px;
+		animation: fadeUp 700ms var(--ease-out) 240ms both;
+	}
+	.pr-input input {
+		flex: 1;
+		background: transparent;
+		color: hsl(var(--text-primary));
+		border: none;
+		outline: none;
+		font-family: var(--font-mono);
+		font-size: 13.5px;
+		padding: 12px 0;
+	}
+	.pr-input input::placeholder {
+		color: hsl(var(--text-muted));
+	}
+	.samples {
+		margin-top: 14px;
+		display: flex;
+		flex-wrap: wrap;
+		gap: 8px;
+		justify-content: center;
+		animation: fadeUp 700ms var(--ease-out) 280ms both;
+	}
+	.small {
+		font-size: 11px;
+		margin-right: 4px;
+	}
+	.sample {
+		display: flex;
+		align-items: center;
+		gap: 6px;
+		font-family: var(--font-mono);
+		font-size: 11.5px;
+		padding: 5px 9px;
+		background: hsl(var(--surface-1));
+		border: 1px solid hsl(var(--border-subtle));
+		border-radius: 99px;
+		color: hsl(var(--text-secondary));
+		cursor: pointer;
+		transition: all var(--duration-base) var(--ease-out);
+	}
+	.sample:hover {
+		background: hsl(var(--surface-2));
+		color: hsl(var(--text-primary));
+	}
+	.sample-tag {
+		color: hsl(var(--accent));
+		font-size: 10px;
+	}
+	.features {
+		margin-top: 56px;
+		display: flex;
+		flex-wrap: wrap;
+		gap: 32px;
+		justify-content: center;
+		font-size: 12px;
+		color: hsl(var(--text-muted));
+		animation: fadeUp 700ms var(--ease-out) 320ms both;
+	}
+	.feature {
+		display: flex;
+		align-items: center;
+		gap: 6px;
+	}
+</style>

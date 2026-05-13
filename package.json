@@ -22,6 +22,13 @@
 		"format": "biome format --write .",
 		"test": "vitest run",
 		"test:watch": "vitest",
+		"test:coverage": "vitest run --coverage",
+		"test:unit": "vitest run src/lib/client src/routes",
+		"test:integration": "vitest run --config vitest.integration.config.ts",
+		"test:e2e": "playwright test",
+		"test:e2e:ui": "playwright test --ui",
+		"test:e2e:visual": "playwright test --grep @visual",
+		"test:all": "pnpm test:unit && pnpm test:integration && pnpm test:e2e",
 		"db:generate": "drizzle-kit generate",
 		"db:migrate": "tsx ./src/lib/server/db/migrate.ts"
 	},
@@ -44,30 +51,43 @@
 		"zod": "^3.23.8"
 	},
 	"devDependencies": {
+		"@axe-core/playwright": "^4.11.3",
 		"@biomejs/biome": "^1.9.4",
 		"@fontsource-variable/geist": "^5.1.0",
 		"@fontsource-variable/geist-mono": "^5.1.0",
+		"@playwright/test": "^1.60.0",
 		"@sveltejs/adapter-node": "^5.2.9",
 		"@sveltejs/kit": "^2.8.1",
 		"@sveltejs/vite-plugin-svelte": "^4.0.1",
+		"@testing-library/jest-dom": "^6.9.1",
 		"@testing-library/svelte": "^5.2.4",
+		"@testing-library/user-event": "^14.6.1",
 		"@types/better-sqlite3": "^7.6.11",
 		"@types/howler": "^2.2.12",
 		"@types/node": "^22.9.0",
 		"@types/tar": "^6.1.13",
+		"@vitest/coverage-v8": "^2.1.9",
 		"autoprefixer": "^10.4.20",
 		"drizzle-kit": "^0.28.0",
 		"jsdom": "^25.0.1",
+		"msw": "^2.14.6",
 		"postcss": "^8.4.49",
 		"svelte": "^5.2.0",
 		"svelte-check": "^4.0.7",
 		"tailwindcss": "^3.4.14",
 		"tsx": "^4.19.2",
 		"typescript": "^5.6.3",
-		"vite": "^6.4.2",
+		"vite": "^5.4.21",
 		"vitest": "^2.1.5"
 	},
 	"pnpm": {
-		"onlyBuiltDependencies": ["@biomejs/biome", "better-sqlite3", "esbuild", "keytar", "argon2"]
+		"onlyBuiltDependencies": [
+			"@biomejs/biome",
+			"better-sqlite3",
+			"esbuild",
+			"keytar",
+			"argon2",
+			"msw"
+		]
 	}
 }
