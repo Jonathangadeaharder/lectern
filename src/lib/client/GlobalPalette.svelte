@@ -199,7 +199,7 @@
 		align-items: flex-start;
 		justify-content: center;
 		padding-top: 12vh;
-		animation: fadeUp 200ms var(--ease-out);
+		animation: fade-up 200ms var(--ease-out);
 	}
 	.palette {
 		width: 640px;

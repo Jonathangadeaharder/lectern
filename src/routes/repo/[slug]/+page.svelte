@@ -6,10 +6,15 @@
 	const p = $derived(data.profile);
 
 	const initial = $derived(p.repoSlug.split('/').pop()?.[0]?.toUpperCase() ?? '?');
-	const masteryPct = $derived(Math.round((p.competence?.avgScore ?? 0) * 100));
+
+	function toPct(score: number | null | undefined): number {
+		return Math.max(0, Math.min(100, Math.round((score ?? 0) * 100)));
+	}
+
+	const masteryPct = $derived(toPct(p.competence?.avgScore));
 
 	function scorePercent(score: number | null): string {
-		if (score === null) return '—';
+		if (score === null) return '\u2014';
 		return `${Math.round(score * 100)}%`;
 	}
 
@@ -65,7 +70,7 @@
 							<div class="pulse-bar">
 								<div
 									class="pulse-bar-fill"
-									style:width={`${Math.round(skill.ewmaScore * 100)}%`}
+									style:width={`${toPct(skill.ewmaScore)}%`}
 									style:background={skill.ewmaScore > 0.7
 										? 'hsl(var(--state-success))'
 										: skill.ewmaScore > 0.5
@@ -73,7 +78,7 @@
 											: 'hsl(var(--state-warning))'}
 								></div>
 							</div>
-							<div class="pulse-score mono">{Math.round(skill.ewmaScore * 100)}</div>
+							<div class="pulse-score mono">{toPct(skill.ewmaScore)}</div>
 							<div class="pulse-level" style:color={levelColors[skill.level]}>
 								{skill.level}
 							</div>
