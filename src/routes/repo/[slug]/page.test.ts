@@ -6,15 +6,15 @@ function payload(over: Record<string, unknown> = {}) {
 	return {
 		profile: {
 			repoSlug: 'drizzle-team/orm',
-			competence: { totalSessions: 9, totalQuestions: 81, avgScore: 0.62 } as const,
-			skills: [] as Array<unknown>,
-			weakSpots: [] as Array<unknown>,
-			bugPatterns: [] as Array<unknown>,
-			conventions: [] as Array<unknown>,
-			recentActivity: [] as Array<unknown>,
+			competence: { repoSlug: 'drizzle-team/orm', totalSessions: 9, totalQuestions: 81, avgScore: 0.62, lastSessionAt: null, updatedAt: Date.now() },
+			skills: [],
+			weakSpots: [],
+			bugPatterns: [],
+			conventions: [],
+			recentActivity: [],
 			...over
 		}
-	};
+	} as any;
 }
 
 describe('Repo Profile', () => {
