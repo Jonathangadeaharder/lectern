@@ -400,9 +400,7 @@ describe('ChunkTitleSchema', () => {
 describe('ChunkTitleListSchema', () => {
 	it('validates a list of chunk titles', () => {
 		const list = {
-			titles: [
-				{ chunkId: 'c1', title: 'Add retry logic', rationale: 'Important for reliability' }
-			]
+			titles: [{ chunkId: 'c1', title: 'Add retry logic', rationale: 'Important for reliability' }]
 		};
 		const result = ChunkTitleListSchema.safeParse(list);
 		expect(result.success).toBe(true);

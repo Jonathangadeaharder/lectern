@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { beforeAll, afterEach, afterAll, describe, it, expect, vi } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/svelte';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
@@ -38,9 +38,7 @@ describe('Debrief + /api/sessions/:id/debrief', () => {
 	});
 
 	it('handles 404 gracefully', async () => {
-		server.use(
-			http.get('/api/sessions/:id/debrief', () => HttpResponse.json({}, { status: 404 }))
-		);
+		server.use(http.get('/api/sessions/:id/debrief', () => HttpResponse.json({}, { status: 404 })));
 		render(Debrief, { data: { sessionId: 'abc' } });
 		await waitFor(() => {
 			expect(screen.getByText(/No debrief available/)).toBeInTheDocument();

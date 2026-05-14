@@ -3,9 +3,10 @@ import { chunkSets, sessions } from '$lib/server/db/schema';
 import type { Chunk } from '$lib/server/services/chunking';
 import { describeSession } from '$lib/server/services/session';
 import { error } from '@sveltejs/kit';
+import type { RequestEvent } from '@sveltejs/kit';
 import { eq } from 'drizzle-orm';
 
-export async function load({ params }) {
+export async function load({ params }: RequestEvent) {
 	const id = params.id;
 	if (!id) throw error(400, 'missing id');
 	let summary: ReturnType<typeof describeSession>;

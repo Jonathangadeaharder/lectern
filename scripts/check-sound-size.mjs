@@ -25,7 +25,9 @@ for (const d of details) {
 console.log(`Total: ${totalKB.toFixed(1)} KB (limit: ${MAX_TOTAL_KB} KB)`);
 
 if (totalKB > MAX_TOTAL_KB) {
-	console.error(`FAIL: Total sound size ${totalKB.toFixed(1)} KB exceeds ${MAX_TOTAL_KB} KB limit.`);
+	console.error(
+		`FAIL: Total sound size ${totalKB.toFixed(1)} KB exceeds ${MAX_TOTAL_KB} KB limit.`
+	);
 	process.exit(1);
 }
 

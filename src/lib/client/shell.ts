@@ -9,7 +9,8 @@
 export function useShell(pathname: string): boolean {
 	const normalized = pathname.replace(/\/+$/, '') || '/';
 	const segments = normalized.split('/').filter(Boolean);
-	const inSessionRun = segments[0] === 'session' && segments.length >= 2 && segments[2] !== 'debrief';
+	const inSessionRun =
+		segments[0] === 'session' && segments.length >= 2 && segments[2] !== 'debrief';
 	const inOnboarding = segments[0] === 'onboarding';
 	return !inSessionRun && !inOnboarding;
 }

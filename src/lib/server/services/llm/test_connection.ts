@@ -40,7 +40,7 @@ export async function testConnection(req: TestConnectionRequest): Promise<TestCo
 		const result = await generateText({
 			model,
 			prompt: 'Reply with the single token: OK',
-			maxTokens: 4,
+			maxOutputTokens: 4,
 			temperature: 0,
 			abortSignal: AbortSignal.timeout(15000)
 		});

@@ -7,9 +7,10 @@ import {
 	listSessionAnswers
 } from '$lib/server/services/session';
 import { error, json } from '@sveltejs/kit';
+import type { RequestEvent } from '@sveltejs/kit';
 import { eq } from 'drizzle-orm';
 
-export async function GET({ params }) {
+export async function GET({ params }: RequestEvent) {
 	const id = params.id;
 	if (!id) throw error(400, 'missing id');
 	try {
@@ -53,7 +54,7 @@ export async function GET({ params }) {
 	}
 }
 
-export async function DELETE({ params }) {
+export async function DELETE({ params }: RequestEvent) {
 	const id = params.id;
 	if (!id) throw error(400, 'missing id');
 	deleteSession(id);

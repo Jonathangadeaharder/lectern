@@ -32,9 +32,30 @@ describe('Repo Profile', () => {
 		render(RepoProfile, {
 			data: payload({
 				skills: [
-					{ tag: 'react', ewmaScore: 0.8, level: 'mastered', totalAttempts: 20, passRate: 0.9, trend: [] },
-					{ tag: 'rust', ewmaScore: 0.6, level: 'proficient', totalAttempts: 15, passRate: 0.7, trend: [] },
-					{ tag: 'css', ewmaScore: 0.2, level: 'novice', totalAttempts: 5, passRate: 0.3, trend: [] }
+					{
+						tag: 'react',
+						ewmaScore: 0.8,
+						level: 'mastered',
+						totalAttempts: 20,
+						passRate: 0.9,
+						trend: []
+					},
+					{
+						tag: 'rust',
+						ewmaScore: 0.6,
+						level: 'proficient',
+						totalAttempts: 15,
+						passRate: 0.7,
+						trend: []
+					},
+					{
+						tag: 'css',
+						ewmaScore: 0.2,
+						level: 'novice',
+						totalAttempts: 5,
+						passRate: 0.3,
+						trend: []
+					}
 				]
 			})
 		});
@@ -74,7 +95,9 @@ describe('Repo Profile', () => {
 	it('renders recent activity section', () => {
 		render(RepoProfile, {
 			data: payload({
-				recentActivity: [{ date: '2026-05-01', questionsAttempted: 5, questionsPassed: 4, avgScore: 0.8 }]
+				recentActivity: [
+					{ date: '2026-05-01', questionsAttempted: 5, questionsPassed: 4, avgScore: 0.8 }
+				]
 			})
 		});
 		expect(screen.getByText('4/5 passed')).toBeInTheDocument();

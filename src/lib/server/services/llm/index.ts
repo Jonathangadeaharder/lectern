@@ -242,7 +242,7 @@ export async function runText(opts: {
 				system: opts.system,
 				prompt: opts.prompt,
 				temperature: opts.temperature ?? 0,
-				maxTokens: opts.maxTokens,
+				maxOutputTokens: opts.maxTokens,
 				abortSignal: opts.signal
 			});
 			logCall(opts.task, Date.now() - t0, true);

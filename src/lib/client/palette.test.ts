@@ -4,7 +4,7 @@ import { filterPalette, groupPalette, clampIndex } from './palette';
 const sample = [
 	{ id: 'a', label: 'Go to Dashboard', hint: 'G then H', group: 'Navigate' },
 	{ id: 'b', label: 'Open settings', hint: '\u2318,', group: 'Navigate' },
-	{ id: 'c', label: 'Paste a new PR\u2026', hint: '\u2318N', group: 'Action' },
+	{ id: 'c', label: 'Paste a new PR\u2026', hint: '\u2318N', group: 'Action' }
 ];
 
 describe('filterPalette', () => {
@@ -30,8 +30,8 @@ describe('groupPalette', () => {
 	it('groups by `group` preserving order', () => {
 		const g = groupPalette(sample);
 		expect(Object.keys(g)).toEqual(['Navigate', 'Action']);
-		expect(g.Navigate.map((i) => i.id)).toEqual(['a', 'b']);
-		expect(g.Action.map((i) => i.id)).toEqual(['c']);
+		expect(g.Navigate!.map((i) => i.id)).toEqual(['a', 'b']);
+		expect(g.Action!.map((i) => i.id)).toEqual(['c']);
 	});
 });
 

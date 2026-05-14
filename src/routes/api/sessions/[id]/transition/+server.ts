@@ -1,6 +1,7 @@
 import { transition } from '$lib/server/services/session';
 import { IllegalSessionTransition } from '$lib/server/services/session/machine';
 import { error, json } from '@sveltejs/kit';
+import type { RequestEvent } from '@sveltejs/kit';
 import { z } from 'zod';
 
 const BodySchema = z.discriminatedUnion('kind', [
@@ -11,7 +12,7 @@ const BodySchema = z.discriminatedUnion('kind', [
 	z.object({ kind: z.literal('abandon') })
 ]);
 
-export async function POST({ params, request }) {
+export async function POST({ params, request }: RequestEvent) {
 	const id = params.id;
 	if (!id) throw error(400, 'missing id');
 	const body = await request.json().catch(() => null);
