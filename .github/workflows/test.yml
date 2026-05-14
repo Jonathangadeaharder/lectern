@@ -9,6 +9,7 @@ jobs:
       - uses: actions/setup-node@1d0ff469b7ec7b3cb9d8673fde0c81c44821de2a # v4
         with: { node-version: '20', cache: 'pnpm' }
       - run: pnpm install --frozen-lockfile
+      - run: sudo apt-get update -qq && sudo apt-get install -y -qq libsecret-1-0 libsecret-1-dev 2>/dev/null || true
       - run: pnpm build
       - run: pnpm exec svelte-check --tsconfig ./tsconfig.json
       - run: pnpm test:coverage
