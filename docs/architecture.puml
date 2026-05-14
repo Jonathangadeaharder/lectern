@@ -114,7 +114,7 @@ interface "Chunk" as Chunk {
   + index: number
   + title: string
   + rationale: string
-  + hunks: import("/Users/jonathangadeaharder/Documents/projects/lectern/src/lib/server/services/chunking/types").Hunk[]
+  + hunks: import("src/lib/server/services/chunking/types").Hunk[]
   + estimatedMinutes: number
   + primaryFiles: string[]
   + tags: ("test" | "impl")[]
@@ -137,7 +137,7 @@ interface "Hunk" as Hunk {
   + oldLines: number
   + newStart: number
   + newLines: number
-  + lines: import("/Users/jonathangadeaharder/Documents/projects/lectern/src/lib/server/services/chunking/types").DiffLine[]
+  + lines: import("src/lib/server/services/chunking/types").DiffLine[]
   + changeType: "add" | "modify" | "delete" | "rename"
   + renamedFrom: string | undefined
   + binary: boolean
@@ -152,11 +152,11 @@ interface "CalibrationPoint" as CalibrationPoint {
 }
 
 interface "DashboardData" as DashboardData {
-  + heatmap: import("/Users/jonathangadeaharder/Documents/projects/lectern/src/lib/server/services/dashboard/index").HeatmapDay[]
-  + skills: import("/Users/jonathangadeaharder/Documents/projects/lectern/src/lib/server/services/dashboard/index").SkillGridItem[]
-  + repoCards: import("/Users/jonathangadeaharder/Documents/projects/lectern/src/lib/server/services/dashboard/index").RepoCard[]
-  + recentSessions: import("/Users/jonathangadeaharder/Documents/projects/lectern/src/lib/server/services/dashboard/index").RecentSession[]
-  + calibration: import("/Users/jonathangadeaharder/Documents/projects/lectern/src/lib/server/services/dashboard/index").CalibrationPoint[]
+  + heatmap: import("src/lib/server/services/dashboard/index").HeatmapDay[]
+  + skills: import("src/lib/server/services/dashboard/index").SkillGridItem[]
+  + repoCards: import("src/lib/server/services/dashboard/index").RepoCard[]
+  + recentSessions: import("src/lib/server/services/dashboard/index").RecentSession[]
+  + calibration: import("src/lib/server/services/dashboard/index").CalibrationPoint[]
   + totalSessions: number
   + totalQuestions: number
   + overallAvgScore: number | null
@@ -200,8 +200,8 @@ interface "DebriefData" as DebriefData {
   + confidenceScore: number
   + band: "high" | "medium" | "low"
   + recommendation: string
-  + perChunk: import("/Users/jonathangadeaharder/Documents/projects/lectern/src/lib/server/services/debrief/index").PerChunkRow[]
-  + missedByTag: import("/Users/jonathangadeaharder/Documents/projects/lectern/src/lib/server/services/debrief/index").MissedByTagRow[]
+  + perChunk: import("src/lib/server/services/debrief/index").PerChunkRow[]
+  + missedByTag: import("src/lib/server/services/debrief/index").MissedByTagRow[]
   + followUps: string[]
   + generatedAt: number
   + selfConfidence: { questionId: string; chunkTitle: string; selfConfidence: number; computedScore: number; }[] | undefined
@@ -238,7 +238,7 @@ interface "FreeTextPayload" as FreeTextPayload {
 interface "GradeArgs" as GradeArgs {
   + sessionId: string
   + questionId: string
-  + payload: import("/Users/jonathangadeaharder/Documents/projects/lectern/src/lib/server/services/grading/index").AnswerPayload
+  + payload: import("src/lib/server/services/grading/index").AnswerPayload
   + signal: AbortSignal | undefined
 }
 
@@ -289,7 +289,7 @@ interface "BundleManifest" as BundleManifest {
   + source: { url: string; platform: "github" | "gitlab"; host: string; owner: string; repo: string; prNumber: number; fetchedAt: number; }
   + headSha: string
   + baseSha: string
-  + files: import("/Users/jonathangadeaharder/Documents/projects/lectern/src/lib/server/services/ingestion/types").BundleFileEntry[]
+  + files: import("src/lib/server/services/ingestion/types").BundleFileEntry[]
 }
 
 interface "IngestProgressEvent" as IngestProgressEvent {
@@ -303,9 +303,9 @@ interface "IngestProgressEvent" as IngestProgressEvent {
 }
 
 interface "PlatformClient" as PlatformClient {
-  + fetchMetadata(parsed: ParsedPrUrl, signal: AbortSignal | undefined): Promise<import("/Users/jonathangadeaharder/Documents/projects/lectern/src/lib/server/services/ingestion/types").PrMetadata>
+  + fetchMetadata(parsed: ParsedPrUrl, signal: AbortSignal | undefined): Promise<import("src/lib/server/services/ingestion/types").PrMetadata>
   + fetchDiff(parsed: ParsedPrUrl, signal: AbortSignal | undefined): Promise<string>
-  + fetchCommits(parsed: ParsedPrUrl, signal: AbortSignal | undefined): Promise<import("/Users/jonathangadeaharder/Documents/projects/lectern/src/lib/server/services/ingestion/types").PrCommit[]>
+  + fetchCommits(parsed: ParsedPrUrl, signal: AbortSignal | undefined): Promise<import("src/lib/server/services/ingestion/types").PrCommit[]>
   + fetchFile(parsed: ParsedPrUrl, path: string, ref: string, signal: AbortSignal | undefined): Promise<{ content: Buffer; size: number; } | null>
 }
 
@@ -333,7 +333,7 @@ class "InvalidPrUrlError" as InvalidPrUrlError {
 }
 
 interface "ParsedPrUrl" as ParsedPrUrl {
-  + platform: import("/Users/jonathangadeaharder/Documents/projects/lectern/src/lib/server/services/ingestion/url").Platform
+  + platform: import("src/lib/server/services/ingestion/url").Platform
   + host: string
   + owner: string
   + repo: string
@@ -440,7 +440,7 @@ interface "SkillMasteryRow" as SkillMasteryRow {
   + tag: string
   + repoSlug: string | null
   + ewmaScore: number
-  + level: import("/Users/jonathangadeaharder/Documents/projects/lectern/src/lib/server/services/mastery/index").MasteryLevel
+  + level: import("src/lib/server/services/mastery/index").MasteryLevel
   + totalAttempts: number
   + passCount: number
   + lastAttemptAt: number | null
@@ -474,7 +474,7 @@ interface "PreflightResult" as PreflightResult {
   + id: string
   + bundleId: string
   + headSha: string
-  + decision: import("/Users/jonathangadeaharder/Documents/projects/lectern/src/lib/server/services/preflight/index").Decision
+  + decision: import("src/lib/server/services/preflight/index").Decision
   + counts: { blocker: number; major: number; minor: number; }
   + findings: PrAgentReview
   + summary: string
@@ -492,7 +492,7 @@ interface "GenerateForChunkInput" as GenerateForChunkInput {
 interface "RepoConventionRow" as RepoConventionRow {
   + id: string
   + repoSlug: string
-  + source: import("/Users/jonathangadeaharder/Documents/projects/lectern/src/lib/server/services/repo_memory/index").ConventionSource
+  + source: import("src/lib/server/services/repo_memory/index").ConventionSource
   + filePath: string
   + rawContent: string
   + summary: string | null
@@ -531,7 +531,7 @@ interface "SessionRow" as SessionRow {
 }
 
 interface "SessionSummary" as SessionSummary {
-  + session: import("/Users/jonathangadeaharder/Documents/projects/lectern/src/lib/server/services/session/index").SessionRow
+  + session: import("src/lib/server/services/session/index").SessionRow
   + chunks: { chunkId: string; position: number; status: string; }[]
   + questionsByChunk: Map<string, { id: string; format: string; type: string; status: string; }[]>
 }
@@ -1151,175 +1151,171 @@ class "+layout" as _layout <<layout>> {
   path: /
 }
 
-class "+page" as _page <<page>> {
+class "+page" as _page_index <<page>> {
   path: /
 }
 
-class "+server" as _server <<endpoint>> {
+class "+server" as _server_api_chunk_bundleId <<endpoint>> {
   path: /api/chunk/[bundleId]
   dynamic bundleId
 }
 
-class "+server" as _server <<endpoint>> {
+class "+server" as _server_api_dashboard <<endpoint>> {
   path: /api/dashboard
 }
 
-class "+server" as _server <<endpoint>> {
+class "+server" as _server_api_data_clear <<endpoint>> {
   path: /api/data/clear
 }
 
-class "+server" as _server <<endpoint>> {
+class "+server" as _server_api_health <<endpoint>> {
   path: /api/health
 }
 
-class "+server" as _server <<endpoint>> {
+class "+server" as _server_api_ingest <<endpoint>> {
   path: /api/ingest
 }
 
-class "+server" as _server <<endpoint>> {
+class "+server" as _server_api_keys_clear <<endpoint>> {
   path: /api/keys/clear
 }
 
-class "+server" as _server <<endpoint>> {
+class "+server" as _server_api_mastery_reset <<endpoint>> {
   path: /api/mastery/reset
 }
 
-class "+server" as _server <<endpoint>> {
+class "+server" as _server_api_preflight_bundleId <<endpoint>> {
   path: /api/preflight/[bundleId]
   dynamic bundleId
 }
 
-class "+server" as _server <<endpoint>> {
+class "+server" as _server_api_repo_slug <<endpoint>> {
   path: /api/repo/[slug]
   dynamic slug
 }
 
-class "+server" as _server <<endpoint>> {
+class "+server" as _server_api_sessions_id <<endpoint>> {
   path: /api/sessions/[id]
   dynamic id
 }
 
-class "+server" as _server <<endpoint>> {
+class "+server" as _server_api_sessions_id_answers <<endpoint>> {
   path: /api/sessions/[id]/answers
   dynamic id
 }
 
-class "+server" as _server <<endpoint>> {
+class "+server" as _server_api_sessions_id_debrief <<endpoint>> {
   path: /api/sessions/[id]/debrief
   dynamic id
 }
 
-class "+server" as _server <<endpoint>> {
+class "+server" as _server_api_sessions_id_generate <<endpoint>> {
   path: /api/sessions/[id]/generate
   dynamic id
 }
 
-class "+server" as _server <<endpoint>> {
+class "+server" as _server_api_sessions_id_heartbeat <<endpoint>> {
   path: /api/sessions/[id]/heartbeat
   dynamic id
 }
 
-class "+server" as _server <<endpoint>> {
+class "+server" as _server_api_sessions_id_transition <<endpoint>> {
   path: /api/sessions/[id]/transition
   dynamic id
 }
 
-class "+server" as _server <<endpoint>> {
+class "+server" as _server_api_sessions_create <<endpoint>> {
   path: /api/sessions/create
 }
 
-class "+server" as _server <<endpoint>> {
+class "+server" as _server_api_settings_llm_presets <<endpoint>> {
   path: /api/settings/llm/presets
 }
 
-class "+server" as _server <<endpoint>> {
+class "+server" as _server_api_settings_llm_quick <<endpoint>> {
   path: /api/settings/llm/quick
 }
 
-class "+server" as _server <<endpoint>> {
+class "+server" as _server_api_settings_llm_test <<endpoint>> {
   path: /api/settings/llm/test
 }
 
-class "+page.server" as _page_server <<PageLoad>> {
+class "+page.server" as _page_server_dashboard <<PageLoad>> {
   path: /dashboard
 }
 
-class "+page" as _page <<page>> {
+class "+page" as _page_dashboard <<page>> {
   path: /dashboard
 }
 
-class "+page" as _page <<page>> {
+class "+page" as _page_onboarding <<page>> {
   path: /onboarding
 }
 
-class "+page.server" as _page_server <<PageLoad>> {
+class "+page.server" as _page_server_repo_slug <<PageLoad>> {
   path: /repo/[slug]
   dynamic slug
 }
 
-class "+page" as _page <<page>> {
+class "+page" as _page_repo_slug <<page>> {
   path: /repo/[slug]
   dynamic slug
 }
 
-class "+page.server" as _page_server <<PageLoad>> {
+class "+page.server" as _page_server_session_id <<PageLoad>> {
   path: /session/[id]
   dynamic id
 }
 
-class "+page" as _page <<page>> {
+class "+page" as _page_session_id <<page>> {
   path: /session/[id]
   dynamic id
 }
 
-class "+page.server" as _page_server <<PageLoad>> {
+class "+page.server" as _page_server_session_debrief <<PageLoad>> {
   path: /session/[id]/debrief
   dynamic id
 }
 
-class "+page" as _page <<page>> {
+class "+page" as _page_session_debrief <<page>> {
   path: /session/[id]/debrief
   dynamic id
 }
 
-class "+page" as _page <<page>> {
+class "+page" as _page_settings <<page>> {
   path: /settings
 }
 
-class "+page" as _page <<page>> {
+class "+page" as _page_settings_data <<page>> {
   path: /settings/data
 }
 
-class "+page" as _page <<page>> {
+class "+page" as _page_settings_sound <<page>> {
   path: /settings/sound
 }
 
 _layout --> OnboardingBanner : OnboardingBanner
 _layout --> OfflineBanner : OfflineBanner
-_page ..> _External_svelte : onMount
+_page_index ..> _External_svelte : onMount
 OfflineBanner ..> _External_svelte : onMount
 OfflineBanner ..> stopNetworkMonitor : getOnline, startNetworkMonitor
 OnboardingBanner ..> _External_svelte : onMount
 OnboardingBanner ..> _External_app : page
-_page ..> _External_svelte : onMount
-_page ..> _External_svelte : onMount
-_page ..> _External_app : goto
-_page ..> _External_app : page
-_page ..> setVolume : config, setEnabled, setVolume, previewSound, resetToDefaults
-_page ..> SoundConfig : SOUND_NAMES, SoundName
-_page ..> _External_svelte : onMount, onDestroy
-_page ..> _External_app : goto
-_page --> MultipleChoice : MultipleChoice
-_page --> FreeText : FreeText
-_page --> ClickLines : ClickLines
-_page --> TrueFalse : TrueFalse
-_page --> CodeFix : CodeFix
-_page --> DiffViewer : DiffViewer
-_page --> CommandPalette : CommandPalette
-_page ..> setVolume : setEnabled, getEnabled
-_page ..> subscribe : emit
-_page ..> _External_svelte : onMount
-_page ..> subscribe : emit
+_page_index ..> _External_svelte : onMount
+_page_index ..> _External_svelte : onMount
+_page_index ..> _External_app : goto
+_page_index ..> _External_app : goto
+_page_index --> MultipleChoice : MultipleChoice
+_page_index --> FreeText : FreeText
+_page_index --> ClickLines : ClickLines
+_page_index --> TrueFalse : TrueFalse
+_page_index --> CodeFix : CodeFix
+_page_index --> DiffViewer : DiffViewer
+_page_index --> CommandPalette : CommandPalette
+_page_index ..> setVolume : setEnabled, getEnabled
+_page_index ..> subscribe : emit
+_page_index ..> _External_svelte : onMount
+_page_index ..> subscribe : emit
 drizzle_config_ts ..> _External_drizzle_kit : defineConfig
 tailwind_config_ts ..> _External_tailwindcss : Config
 vite_config_ts ..> _External_sveltejs_kit : sveltekit
@@ -1332,7 +1328,7 @@ handle ..> resolveDataDir : resolveDataDir
 handle ..> setQuickConfig : getQuickConfig
 handle ..> _External_sveltejs_kit : Handle
 handle ..> _External_sveltejs_kit : redirect
-_page_server ..> getRepoProfileData : getDashboardData
+_page_server_dashboard ..> getRepoProfileData : getDashboardData
 subscribe ..> setVolume : play
 subscribe ..> SoundConfig : EVENT_SOUND_MAP, SoundEventName
 setVolume *-- setGlobalVolume : previewSound, resetConfig, setGlobalVolume, canPlay, config, ensureHowler, playSound
@@ -1346,17 +1342,17 @@ runMigrations ..> _External_drizzle_orm : migrate
 runMigrations ..> resolveDataDir : dbPath
 runMigrations ..> src_lib_server_db_schema_index_ts
 src_lib_server_db_migrate_ts ..> runMigrations : runMigrations
-_server ..> getRepoProfileData : getDashboardData
-_server ..> _External_sveltejs_kit : json
-_server ..> resolveDataDir : dbPath, resolveDataDir
-_server ..> setQuickConfig : getQuickConfig
-_server ..> _External_sveltejs_kit : json
-_server ..> ingestFromUrl : IngestionAuthError, ingestFromUrl
-_server ..> validateBundleManifest : IngestProgressEvent
-_server ..> _External_sveltejs_kit : error
-_server ..> _External_zod
-_page_server ..> getRepoProfileData : getRepoProfileData
-_page_server ..> _External_sveltejs_kit : error
+_server_api_dashboard ..> getRepoProfileData : getDashboardData
+_server_api_dashboard ..> _External_sveltejs_kit : json
+_server_api_dashboard ..> resolveDataDir : dbPath, resolveDataDir
+_server_api_dashboard ..> setQuickConfig : getQuickConfig
+_server_api_dashboard ..> _External_sveltejs_kit : json
+_server_api_dashboard ..> ingestFromUrl : IngestionAuthError, ingestFromUrl
+_server_api_dashboard ..> validateBundleManifest : IngestProgressEvent
+_server_api_dashboard ..> _External_sveltejs_kit : error
+_server_api_dashboard ..> _External_zod
+_page_server_repo_slug ..> getRepoProfileData : getRepoProfileData
+_page_server_repo_slug ..> _External_sveltejs_kit : error
 src_lib_server_db_schema_answers_ts ..> _External_drizzle_orm : index, integer, real, sqliteTable, text
 src_lib_server_db_schema_answers_ts ..> src_lib_server_db_schema_questions_ts : sessionQuestions
 src_lib_server_db_schema_answers_ts ..> src_lib_server_db_schema_sessions_ts : sessions
@@ -1380,12 +1376,12 @@ src_lib_server_db_schema_repo_scan_state_ts ..> _External_drizzle_orm : sqliteTa
 src_lib_server_db_schema_session_activity_ts ..> _External_drizzle_orm : index, integer, real, sqliteTable, text
 src_lib_server_db_schema_sessions_ts ..> _External_drizzle_orm : integer, sqliteTable, text
 src_lib_server_db_schema_sessions_ts ..> src_lib_server_db_schema_bundles_ts : bundles
-_page_server ..> runMigrations : getDb
-_page_server ..> src_lib_server_db_schema_index_ts : chunkSets, sessions
-_page_server ..> chunkBundle : Chunk
-_page_server ..> transition : describeSession
-_page_server ..> _External_sveltejs_kit : error
-_page_server ..> _External_drizzle_orm : eq
+_page_server_session_id ..> runMigrations : getDb
+_page_server_session_id ..> src_lib_server_db_schema_index_ts : chunkSets, sessions
+_page_server_session_id ..> chunkBundle : Chunk
+_page_server_session_id ..> transition : describeSession
+_page_server_session_id ..> _External_sveltejs_kit : error
+_page_server_session_id ..> _External_drizzle_orm : eq
 updateScanState ..> _External_drizzle_orm : eq
 updateScanState ..> _External_node_crypto : randomUUID
 updateScanState ..> _External_node_fs : readFileSync, existsSync
@@ -1525,8 +1521,8 @@ runPreflight ..> runMigrations : getDb
 runPreflight ..> src_lib_server_db_schema_index_ts : bundles, preflightOverrides, preflightResults
 runPreflight ..> runReview : PrAgentCrashError, PrAgentParseError, PrAgentReview, PrAgentSetupError, PrAgentTimeoutError, isPrAgentAvailable, runReview
 runPreflight ..> writeBundle : readBundleManifest
-_server ..> chunkBundle : chunkBundle
-_server ..> _External_sveltejs_kit : error, json
+_server_api_chunk_bundleId ..> chunkBundle : chunkBundle
+_server_api_chunk_bundleId ..> _External_sveltejs_kit : error, json
 setSetting ..> _External_drizzle_orm : eq
 setSetting ..> runMigrations : getDb
 setSetting ..> src_lib_server_db_schema_index_ts : appSettings
@@ -1540,62 +1536,62 @@ tokenize ..> streamStructured : runStructured
 tokenize ..> LlmSchemaError : LlmSchemaError
 tokenize ..> buildUser
 tokenize ..> src_lib_server_services_llm_schemas_index_ts : Question, QuestionListSchema
-_server ..> runPreflight : recordOverride, runPreflight
-_server ..> _External_sveltejs_kit : error, json
-_server ..> _External_sveltejs_kit : json
-_server ..> updateMasteryFromSession : resetMastery, resetAllMastery
-_server ..> runMigrations : getDb
-_server ..> src_lib_server_db_schema_index_ts : answers, debriefs, sessionActivity, sessions
-_server ..> _External_sveltejs_kit : json
-_server ..> setKey : deleteKey, listAccounts
-_server ..> _External_sveltejs_kit : json
-_server ..> ingestFromUrl : IngestionAuthError, ingestFromUrl
-_server ..> transition : createSession
-_server ..> _External_sveltejs_kit : error, json, redirect
-_server ..> _External_zod
-_server ..> getRepoProfileData : getRepoProfileData
-_server ..> _External_sveltejs_kit : json
-_server ..> runMigrations : getDb
-_server ..> src_lib_server_db_schema_index_ts : chunkSets, sessionQuestions, sessions
-_server ..> transition : deleteSession, describeSession, listSessionAnswers
-_server ..> _External_sveltejs_kit : error, json
-_server ..> _External_drizzle_orm : eq
+_server_api_preflight_bundleId ..> runPreflight : recordOverride, runPreflight
+_server_api_preflight_bundleId ..> _External_sveltejs_kit : error, json
+_server_api_preflight_bundleId ..> _External_sveltejs_kit : json
+_server_api_preflight_bundleId ..> updateMasteryFromSession : resetMastery, resetAllMastery
+_server_api_data_clear ..> runMigrations : getDb
+_server_api_data_clear ..> src_lib_server_db_schema_index_ts : answers, debriefs, sessionActivity, sessions
+_server_api_health ..> _External_sveltejs_kit : json
+_server_api_keys_clear ..> setKey : deleteKey, listAccounts
+_server_api_keys_clear ..> _External_sveltejs_kit : json
+_server_api_ingest ..> ingestFromUrl : IngestionAuthError, ingestFromUrl
+_server_api_ingest ..> transition : createSession
+_server_api_ingest ..> _External_sveltejs_kit : error, json, redirect
+_server_api_ingest ..> _External_zod
+_server_api_repo_slug ..> getRepoProfileData : getRepoProfileData
+_server_api_repo_slug ..> _External_sveltejs_kit : json
+_server_api_repo_slug ..> runMigrations : getDb
+_server_api_repo_slug ..> src_lib_server_db_schema_index_ts : chunkSets, sessionQuestions, sessions
+_server_api_repo_slug ..> transition : deleteSession, describeSession, listSessionAnswers
+_server_api_repo_slug ..> _External_sveltejs_kit : error, json
+_server_api_repo_slug ..> _External_drizzle_orm : eq
 src_lib_server_services_llm_schemas_chunk_ts ..> _External_zod
 src_lib_server_services_llm_schemas_grade_ts ..> _External_zod
 src_lib_server_services_llm_schemas_question_ts ..> _External_zod
 src_lib_server_services_llm_schemas_question_ts ..> src_lib_server_services_llm_schemas_rubric_ts : RubricSchema
 src_lib_server_services_llm_schemas_rubric_ts ..> _External_zod
-_server ..> invalidateProviderCache : invalidateProviderCache
-_server ..> setQuickConfig : QuickConfigSchema, getQuickConfig, setQuickConfig
-_server ..> setKey : hasKey, setKey
-_server ..> _External_sveltejs_kit : error, json
-_server ..> _External_zod
-_page_server ..> runMigrations : getDb
-_page_server ..> src_lib_server_db_schema_index_ts : sessions
-_page_server ..> _External_sveltejs_kit : error
-_page_server ..> _External_drizzle_orm : eq
-_server ..> setQuickConfig : PROVIDER_PRESETS
-_server ..> _External_sveltejs_kit : json
-_server ..> testConnection : TestConnectionRequestSchema, testConnection
-_server ..> _External_sveltejs_kit : error, json
-_server ..> streamGradeFreeText : gradeAnswer, streamGradeFreeText
-_server ..> _External_sveltejs_kit : error, json
-_server ..> _External_zod
-_server ..> generateDebrief : generateDebrief
-_server ..> _External_sveltejs_kit : error, json
-_server ..> transition : recordHeartbeat
-_server ..> _External_sveltejs_kit : error, json
-_server ..> transition : transition
-_server ..> nextState : IllegalSessionTransition
-_server ..> _External_sveltejs_kit : error, json
-_server ..> _External_zod
-_server ..> runMigrations : getDb
-_server ..> src_lib_server_db_schema_index_ts : chunkSets, sessionQuestions, sessions
-_server ..> chunkBundle : Chunk
-_server ..> tokenize : generateQuestionsForChunk
-_server ..> _External_sveltejs_kit : error, json
-_server ..> _External_drizzle_orm : eq
-_server ..> _External_zod
+_server_api_settings_llm_presets ..> invalidateProviderCache : invalidateProviderCache
+_server_api_settings_llm_presets ..> setQuickConfig : QuickConfigSchema, getQuickConfig, setQuickConfig
+_server_api_settings_llm_presets ..> setKey : hasKey, setKey
+_server_api_settings_llm_presets ..> _External_sveltejs_kit : error, json
+_server_api_settings_llm_presets ..> _External_zod
+_page_server_session_debrief ..> runMigrations : getDb
+_page_server_session_debrief ..> src_lib_server_db_schema_index_ts : sessions
+_page_server_session_debrief ..> _External_sveltejs_kit : error
+_page_server_session_debrief ..> _External_drizzle_orm : eq
+_server_api_sessions_id_answers ..> setQuickConfig : PROVIDER_PRESETS
+_server_api_sessions_id_answers ..> _External_sveltejs_kit : json
+_server_api_sessions_id_answers ..> testConnection : TestConnectionRequestSchema, testConnection
+_server_api_sessions_id_answers ..> _External_sveltejs_kit : error, json
+_server_api_sessions_id_answers ..> streamGradeFreeText : gradeAnswer, streamGradeFreeText
+_server_api_sessions_id_answers ..> _External_sveltejs_kit : error, json
+_server_api_sessions_id_answers ..> _External_zod
+_server_api_sessions_id_debrief ..> generateDebrief : generateDebrief
+_server_api_sessions_id_debrief ..> _External_sveltejs_kit : error, json
+_server_api_sessions_id_heartbeat ..> transition : recordHeartbeat
+_server_api_sessions_id_heartbeat ..> _External_sveltejs_kit : error, json
+_server_api_sessions_id_transition ..> transition : transition
+_server_api_sessions_id_transition ..> nextState : IllegalSessionTransition
+_server_api_sessions_id_transition ..> _External_sveltejs_kit : error, json
+_server_api_sessions_id_transition ..> _External_zod
+_server_api_sessions_id_generate ..> runMigrations : getDb
+_server_api_sessions_id_generate ..> src_lib_server_db_schema_index_ts : chunkSets, sessionQuestions, sessions
+_server_api_sessions_id_generate ..> chunkBundle : Chunk
+_server_api_sessions_id_generate ..> tokenize : generateQuestionsForChunk
+_server_api_sessions_id_generate ..> _External_sveltejs_kit : error, json
+_server_api_sessions_id_generate ..> _External_drizzle_orm : eq
+_server_api_sessions_id_generate ..> _External_zod
 svelte_config_js ..> _External_sveltejs_adapter_node : adapter
 svelte_config_js ..> _External_sveltejs_vite_plugin_svelte : vitePreprocess
 build_env_js ..> _External_node_process : process

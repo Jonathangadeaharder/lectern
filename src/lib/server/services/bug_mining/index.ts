@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { randomUUID } from 'node:crypto';
 import { readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
@@ -91,7 +91,11 @@ export function ingestCommit(params: {
 	const now = Date.now();
 	const { isBugFix, isRefactor } = classifyCommit(params.message);
 
-	const existing = db.select().from(bugCommits).where(eq(bugCommits.sha, params.sha)).get();
+	const existing = db
+		.select()
+		.from(bugCommits)
+		.where(and(eq(bugCommits.repoSlug, params.repoSlug), eq(bugCommits.sha, params.sha)))
+		.get();
 
 	if (existing) return existing as BugCommitRow;
 
@@ -131,7 +135,7 @@ export function szzTraceBack(params: {
 	for (const file of files) {
 		const blameSha = params.getBlame(params.bugFixSha, file);
 		if (blameSha && blameSha !== params.bugFixSha) {
-			db.update(bugCommits).set({ blameSha }).where(eq(bugCommits.sha, params.bugFixSha)).run();
+			db.update(bugCommits).set({ blameSha }).where(and(eq(bugCommits.repoSlug, params.repoSlug), eq(bugCommits.sha, params.bugFixSha))).run();
 			return blameSha;
 		}
 	}
