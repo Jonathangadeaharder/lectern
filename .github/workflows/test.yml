@@ -9,6 +9,7 @@ jobs:
       - uses: actions/setup-node@1d0ff469b7ec7b3cb9d8673fde0c81c44821de2a # v4
         with: { node-version: '20', cache: 'pnpm' }
       - run: pnpm install --frozen-lockfile
+      - run: pnpm build
       - run: pnpm exec svelte-check --tsconfig ./tsconfig.json
       - run: pnpm test:coverage
       - uses: codecov/codecov-action@0565863a31f2c772f9f0395002a31e3f06189574 # v4
