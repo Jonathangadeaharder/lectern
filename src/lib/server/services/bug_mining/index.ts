@@ -232,18 +232,9 @@ export interface AiTypicalPattern {
 
 export function loadAiTypicalCatalog(): AiTypicalPattern[] {
 	const candidates = [
-		join(process.cwd(), 'data', 'ai_typical_catalog.yaml'),
-		join(
-			import.meta.dirname ?? '.',
-			'..',
-			'..',
-			'..',
-			'..',
-			'..',
-			'data',
-			'ai_typical_catalog.yaml'
-		)
-	];
+		process.env.LECTERN_CATALOG_PATH,
+		join(process.cwd(), 'data', 'ai_typical_catalog.yaml')
+	].filter(Boolean) as string[];
 
 	for (const path of candidates) {
 		if (!existsSync(path)) continue;

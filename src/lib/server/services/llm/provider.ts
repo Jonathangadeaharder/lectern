@@ -44,11 +44,10 @@ export async function getModel(task?: TaskName): Promise<LanguageModel> {
 		baseURL: endpoint,
 		apiKey: token,
 		headers,
-		supportsStructuredOutputs: true,
 		fetch: process.env.LECTERN_LLM_DEBUG === '1' ? loggingFetch : undefined
 	});
 
-	return provider.chatModel(model) as unknown as LanguageModel;
+	return provider.chatModel(model, undefined, { supportsStructuredOutputs: true }) as unknown as LanguageModel;
 }
 
 const loggingFetch: typeof fetch = async (input, init) => {
@@ -72,10 +71,9 @@ export function buildModelFromValues(
 		name: 'lectern-test',
 		baseURL: endpoint,
 		apiKey: resolveSecret(token),
-		headers,
-		supportsStructuredOutputs: true
+		headers
 	});
-	return provider.chatModel(model) as unknown as LanguageModel;
+	return provider.chatModel(model, undefined, { supportsStructuredOutputs: true }) as unknown as LanguageModel;
 }
 
 export function getCachedConfig(): {
