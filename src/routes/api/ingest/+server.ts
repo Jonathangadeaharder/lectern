@@ -1,11 +1,12 @@
 import { IngestionAuthError, ingestFromUrl } from '$lib/server/services/ingestion';
 import type { IngestProgressEvent } from '$lib/server/services/ingestion/types';
 import { error } from '@sveltejs/kit';
+import type { RequestEvent } from '@sveltejs/kit';
 import { z } from 'zod';
 
 const BodySchema = z.object({ url: z.string().url() });
 
-export async function POST({ request }) {
+export async function POST({ request }: RequestEvent) {
 	const body = await request.json().catch(() => null);
 	const parsed = BodySchema.safeParse(body);
 	if (!parsed.success) throw error(400, 'Invalid body — expected { url }');

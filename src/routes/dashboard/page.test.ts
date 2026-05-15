@@ -1,15 +1,16 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/svelte';
 import Dashboard from './+page.svelte';
+import type { SkillGridItem, RepoCard, RecentSession, CalibrationPoint } from '$lib/server/services/dashboard';
 
 function payload(over: Record<string, unknown> = {}) {
 	return {
 		dashboard: {
 			heatmap: [] as Array<{ date: string; count: number; avgScore: number | null }>,
-			skills: [] as Array<unknown>,
-			repoCards: [] as Array<unknown>,
-			recentSessions: [] as Array<unknown>,
-			calibration: [] as Array<unknown>,
+			skills: [] as SkillGridItem[],
+			repoCards: [] as RepoCard[],
+			recentSessions: [] as RecentSession[],
+			calibration: [] as CalibrationPoint[],
 			totalSessions: 0,
 			totalQuestions: 0,
 			overallAvgScore: null,

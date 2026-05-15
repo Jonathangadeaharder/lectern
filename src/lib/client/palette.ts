@@ -8,9 +8,7 @@ export interface PaletteItem {
 export function filterPalette<T extends PaletteItem>(items: T[], query: string): T[] {
 	const q = query.trim().toLowerCase();
 	if (!q) return items;
-	return items.filter(
-		(i) => i.label.toLowerCase().includes(q) || i.hint.toLowerCase().includes(q)
-	);
+	return items.filter((i) => i.label.toLowerCase().includes(q) || i.hint.toLowerCase().includes(q));
 }
 
 export function groupPalette<T extends PaletteItem>(items: T[]): Record<string, T[]> {

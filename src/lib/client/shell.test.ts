@@ -9,7 +9,7 @@ describe('useShell', () => {
 		['/repo/owner/name', true],
 		['/settings', true],
 		['/settings/keys', true],
-		['/session/abc/debrief', true],
+		['/session/abc/debrief', true]
 	])('returns shell for %s', (p, expected) => {
 		expect(useShell(p)).toBe(expected);
 	});
@@ -19,7 +19,7 @@ describe('useShell', () => {
 		['/session/abc/', false],
 		['/session/abc/anything-but-debrief', false],
 		['/onboarding', false],
-		['/onboarding/step-1', false],
+		['/onboarding/step-1', false]
 	])('returns no shell for %s', (p, expected) => {
 		expect(useShell(p)).toBe(expected);
 	});

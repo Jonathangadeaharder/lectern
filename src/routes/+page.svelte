@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
+	import { onMount, tick } from 'svelte';
 	import Icon from '$lib/client/Icon.svelte';
 	import LecternMark from '$lib/client/LecternMark.svelte';
 
@@ -26,9 +26,10 @@
 		}
 	];
 
-	function trySample(url: string) {
+	async function trySample(url: string) {
 		prUrl = url;
-		setTimeout(() => formEl?.requestSubmit());
+		await tick();
+		formEl?.requestSubmit();
 	}
 
 	onMount(async () => {

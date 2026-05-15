@@ -68,7 +68,9 @@ setTimeout(() => {
 const playLog = [];
 let testDone = false;
 let doneResolve;
-const donePromise = new Promise((r) => { doneResolve = r; });
+const donePromise = new Promise((r) => {
+	doneResolve = r;
+});
 
 const server = createServer(async (req, res) => {
 	if (req.url === '/' && req.method === 'GET') {
@@ -136,7 +138,7 @@ async function cleanup() {
 	const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
 	rl.question('Your rating (1-3): ', (answer) => {
 		const rating = answer.trim();
-		const label = { '1': 'tolerable', '2': 'borderline', '3': 'intolerable' }[rating] ?? 'unknown';
+		const label = { 1: 'tolerable', 2: 'borderline', 3: 'intolerable' }[rating] ?? 'unknown';
 		const date = new Date().toISOString().split('T')[0];
 		const result = {
 			sound: soundName,

@@ -3,9 +3,26 @@ import { render } from '@testing-library/svelte';
 import Icon from './Icon.svelte';
 
 const NAMES = [
-	'home', 'book', 'repo', 'chart', 'plus', 'search', 'settings', 'flame',
-	'chevron-right', 'command', 'arrow-right', 'arrow-up', 'arrow-down',
-	'sun-moon', 'pull-request', 'zap', 'brain', 'layers', 'download', 'x'
+	'home',
+	'book',
+	'repo',
+	'chart',
+	'plus',
+	'search',
+	'settings',
+	'flame',
+	'chevron-right',
+	'command',
+	'arrow-right',
+	'arrow-up',
+	'arrow-down',
+	'sun-moon',
+	'pull-request',
+	'zap',
+	'brain',
+	'layers',
+	'download',
+	'x'
 ] as const;
 
 describe('Icon', () => {

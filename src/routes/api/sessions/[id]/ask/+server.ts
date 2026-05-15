@@ -12,7 +12,9 @@ const SYSTEM = `You are a code-review assistant. The reviewer is reading a pull 
 
 Answer concisely (1-4 short paragraphs). Reference specific identifiers when helpful. If the snippet is incomplete and the answer truly depends on missing context, say so plainly and suggest what to look at. Do not hedge or pad.`;
 
-export async function POST({ params, request }) {
+import type { RequestEvent } from '@sveltejs/kit';
+
+export async function POST({ params, request }: RequestEvent) {
 	const id = params.id;
 	if (!id) throw error(400, 'missing session id');
 	const body = await request.json().catch(() => null);

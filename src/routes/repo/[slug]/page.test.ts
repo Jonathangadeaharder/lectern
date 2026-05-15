@@ -6,15 +6,15 @@ function payload(over: Record<string, unknown> = {}) {
 	return {
 		profile: {
 			repoSlug: 'drizzle-team/orm',
-			competence: { totalSessions: 9, totalQuestions: 81, avgScore: 0.62 } as const,
-			skills: [] as Array<unknown>,
-			weakSpots: [] as Array<unknown>,
-			bugPatterns: [] as Array<unknown>,
-			conventions: [] as Array<unknown>,
-			recentActivity: [] as Array<unknown>,
+			competence: { repoSlug: 'drizzle-team/orm', totalSessions: 9, totalQuestions: 81, avgScore: 0.62, lastSessionAt: null, updatedAt: Date.now() },
+			skills: [],
+			weakSpots: [],
+			bugPatterns: [],
+			conventions: [],
+			recentActivity: [],
 			...over
 		}
-	};
+	} as any;
 }
 
 describe('Repo Profile', () => {
@@ -32,9 +32,30 @@ describe('Repo Profile', () => {
 		render(RepoProfile, {
 			data: payload({
 				skills: [
-					{ tag: 'react', ewmaScore: 0.8, level: 'mastered', totalAttempts: 20, passRate: 0.9, trend: [] },
-					{ tag: 'rust', ewmaScore: 0.6, level: 'proficient', totalAttempts: 15, passRate: 0.7, trend: [] },
-					{ tag: 'css', ewmaScore: 0.2, level: 'novice', totalAttempts: 5, passRate: 0.3, trend: [] }
+					{
+						tag: 'react',
+						ewmaScore: 0.8,
+						level: 'mastered',
+						totalAttempts: 20,
+						passRate: 0.9,
+						trend: []
+					},
+					{
+						tag: 'rust',
+						ewmaScore: 0.6,
+						level: 'proficient',
+						totalAttempts: 15,
+						passRate: 0.7,
+						trend: []
+					},
+					{
+						tag: 'css',
+						ewmaScore: 0.2,
+						level: 'novice',
+						totalAttempts: 5,
+						passRate: 0.3,
+						trend: []
+					}
 				]
 			})
 		});
@@ -74,7 +95,9 @@ describe('Repo Profile', () => {
 	it('renders recent activity section', () => {
 		render(RepoProfile, {
 			data: payload({
-				recentActivity: [{ date: '2026-05-01', questionsAttempted: 5, questionsPassed: 4, avgScore: 0.8 }]
+				recentActivity: [
+					{ date: '2026-05-01', questionsAttempted: 5, questionsPassed: 4, avgScore: 0.8 }
+				]
 			})
 		});
 		expect(screen.getByText('4/5 passed')).toBeInTheDocument();

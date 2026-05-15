@@ -42,7 +42,7 @@ export class PrAgentParseError extends Error {
 	}
 }
 
-const FindingSchema = z.object({
+export const FindingSchema = z.object({
 	id: z.string().optional(),
 	category: z.string().optional(),
 	severityHint: z.enum(['blocker', 'major', 'minor']).optional(),
@@ -53,7 +53,7 @@ const FindingSchema = z.object({
 	suggestion: z.string().optional()
 });
 
-const PrAgentReviewSchema = z.object({
+export const PrAgentReviewSchema = z.object({
 	task: z.literal('review'),
 	findings: z.array(FindingSchema).default([]),
 	summary: z.string().default(''),

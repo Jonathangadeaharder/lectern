@@ -80,9 +80,7 @@ export function updateMastery(params: {
 	const existing = db
 		.select()
 		.from(skillMastery)
-		.where(
-			and(eq(skillMastery.tag, params.tag), eq(skillMastery.repoSlug, repoSlug ?? ''))
-		)
+		.where(and(eq(skillMastery.tag, params.tag), eq(skillMastery.repoSlug, repoSlug ?? '')))
 		.get();
 
 	if (existing) {
@@ -204,9 +202,7 @@ export function getMasteryForTag(tag: string, repoSlug?: string | null): SkillMa
 	const row = db
 		.select()
 		.from(skillMastery)
-		.where(
-			and(eq(skillMastery.tag, tag), eq(skillMastery.repoSlug, repoSlug ?? ''))
-		)
+		.where(and(eq(skillMastery.tag, tag), eq(skillMastery.repoSlug, repoSlug ?? '')))
 		.get();
 	return (row as SkillMasteryRow) ?? null;
 }
@@ -267,11 +263,7 @@ export function updateMasteryFromSession(
 		.where(eq(sessionQuestions.sessionId, sessionId))
 		.all();
 
-	const aRows = db
-		.select()
-		.from(answers)
-		.where(eq(answers.sessionId, sessionId))
-		.all();
+	const aRows = db.select().from(answers).where(eq(answers.sessionId, sessionId)).all();
 
 	const answerByQId = new Map(aRows.map((a) => [a.questionId, a]));
 	const updated: SkillMasteryRow[] = [];

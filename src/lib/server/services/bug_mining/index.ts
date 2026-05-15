@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { randomUUID } from 'node:crypto';
 import { readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
@@ -94,7 +94,7 @@ export function ingestCommit(params: {
 	const existing = db
 		.select()
 		.from(bugCommits)
-		.where(eq(bugCommits.sha, params.sha))
+		.where(and(eq(bugCommits.repoSlug, params.repoSlug), eq(bugCommits.sha, params.sha)))
 		.get();
 
 	if (existing) return existing as BugCommitRow;
@@ -135,10 +135,7 @@ export function szzTraceBack(params: {
 	for (const file of files) {
 		const blameSha = params.getBlame(params.bugFixSha, file);
 		if (blameSha && blameSha !== params.bugFixSha) {
-			db.update(bugCommits)
-				.set({ blameSha })
-				.where(eq(bugCommits.sha, params.bugFixSha))
-				.run();
+			db.update(bugCommits).set({ blameSha }).where(and(eq(bugCommits.repoSlug, params.repoSlug), eq(bugCommits.sha, params.bugFixSha))).run();
 			return blameSha;
 		}
 	}
@@ -239,9 +236,9 @@ export interface AiTypicalPattern {
 
 export function loadAiTypicalCatalog(): AiTypicalPattern[] {
 	const candidates = [
-		join(process.cwd(), 'data', 'ai_typical_catalog.yaml'),
-		join(import.meta.dirname ?? '.', '..', '..', '..', '..', '..', 'data', 'ai_typical_catalog.yaml')
-	];
+		process.env.LECTERN_CATALOG_PATH,
+		join(process.cwd(), 'data', 'ai_typical_catalog.yaml')
+	].filter(Boolean) as string[];
 
 	for (const path of candidates) {
 		if (!existsSync(path)) continue;
@@ -261,9 +258,21 @@ function parseYamlCatalog(raw: string): AiTypicalPattern[] {
 
 	for (const block of patternBlocks) {
 		const id = block.match(/^\S+/)?.[0] ?? '';
-		const summary = block.match(/summary:\s*"([^"]*)"/)?.[1] ?? block.match(/summary:\s*'([^']*)'/)?.[1] ?? block.match(/summary:\s*(.+)$/m)?.[1]?.trim() ?? '';
-		const description = block.match(/description:\s*"([^"]*)"/)?.[1] ?? block.match(/description:\s*'([^']*)'/)?.[1] ?? block.match(/description:\s*(.+)$/m)?.[1]?.trim() ?? '';
-		const rootCause = block.match(/root_cause:\s*"([^"]*)"/)?.[1] ?? block.match(/root_cause:\s*'([^']*)'/)?.[1] ?? block.match(/root_cause:\s*(.+)$/m)?.[1]?.trim() ?? '';
+		const summary =
+			block.match(/summary:\s*"([^"]*)"/)?.[1] ??
+			block.match(/summary:\s*'([^']*)'/)?.[1] ??
+			block.match(/summary:\s*(.+)$/m)?.[1]?.trim() ??
+			'';
+		const description =
+			block.match(/description:\s*"([^"]*)"/)?.[1] ??
+			block.match(/description:\s*'([^']*)'/)?.[1] ??
+			block.match(/description:\s*(.+)$/m)?.[1]?.trim() ??
+			'';
+		const rootCause =
+			block.match(/root_cause:\s*"([^"]*)"/)?.[1] ??
+			block.match(/root_cause:\s*'([^']*)'/)?.[1] ??
+			block.match(/root_cause:\s*(.+)$/m)?.[1]?.trim() ??
+			'';
 		const confidence = parseFloat(block.match(/confidence:\s*([\d.]+)/)?.[1] ?? '0.5');
 
 		const fileGlobs: string[] = [];
@@ -345,9 +354,7 @@ export function matchPatternsToChunk(
 	for (const pattern of patterns) {
 		const globs = JSON.parse(pattern.fileGlobsJson) as string[];
 		const regexes = globs.map(globToRe);
-		const matchedFiles = chunkFilePaths.filter((fp) =>
-			regexes.some((re) => re.test(fp))
-		);
+		const matchedFiles = chunkFilePaths.filter((fp) => regexes.some((re) => re.test(fp)));
 		if (matchedFiles.length > 0) {
 			results.push({ pattern, matchedFiles });
 		}
@@ -365,11 +372,7 @@ export interface ScanStateRow {
 
 export function getScanState(repoSlug: string): ScanStateRow | null {
 	const db = getDb();
-	const row = db
-		.select()
-		.from(repoScanState)
-		.where(eq(repoScanState.repoSlug, repoSlug))
-		.get();
+	const row = db.select().from(repoScanState).where(eq(repoScanState.repoSlug, repoSlug)).get();
 	return (row as ScanStateRow) ?? null;
 }
 

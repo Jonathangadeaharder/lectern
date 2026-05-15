@@ -1,5 +1,6 @@
 import { gradeAnswer, streamGradeFreeText } from '$lib/server/services/grading';
 import { error, json } from '@sveltejs/kit';
+import type { RequestEvent } from '@sveltejs/kit';
 import { z } from 'zod';
 
 const McSchema = z.object({
@@ -42,7 +43,7 @@ const BodySchema = z.union([
 	SkipSchema
 ]);
 
-export async function POST({ params, request }) {
+export async function POST({ params, request }: RequestEvent) {
 	const sessionId = params.id;
 	if (!sessionId) throw error(400, 'missing session id');
 	const body = await request.json().catch(() => null);

@@ -203,7 +203,9 @@ async function checkPrSize(
 
 		const fileCount = manifest.files.filter((f) => !f.binary).length;
 		const largeFiles = manifest.files.filter(
-			(f) => !f.binary && (f.headSize > LARGE_FILE_LINE_THRESHOLD * 30 || f.baseSize > LARGE_FILE_LINE_THRESHOLD * 30)
+			(f) =>
+				!f.binary &&
+				(f.headSize > LARGE_FILE_LINE_THRESHOLD * 30 || f.baseSize > LARGE_FILE_LINE_THRESHOLD * 30)
 		);
 
 		if (largeFiles.length > 0) {

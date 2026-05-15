@@ -3,6 +3,7 @@ import { chunkSets, sessionQuestions, sessions } from '$lib/server/db/schema';
 import type { Chunk } from '$lib/server/services/chunking';
 import { generateQuestionsForChunk } from '$lib/server/services/questions';
 import { error, json } from '@sveltejs/kit';
+import type { RequestEvent } from '@sveltejs/kit';
 import { eq } from 'drizzle-orm';
 import { z } from 'zod';
 
@@ -11,7 +12,7 @@ const BodySchema = z.object({
 	weakTags: z.array(z.string()).optional()
 });
 
-export async function POST({ params, request }) {
+export async function POST({ params, request }: RequestEvent) {
 	const sessionId = params.id;
 	if (!sessionId) throw error(400, 'missing session id');
 
@@ -83,7 +84,7 @@ export async function POST({ params, request }) {
 	});
 }
 
-export async function GET({ params }) {
+export async function GET({ params }: RequestEvent) {
 	const sessionId = params.id;
 	if (!sessionId) throw error(400, 'missing session id');
 

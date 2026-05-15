@@ -1,5 +1,5 @@
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
-import type { LanguageModelV2 } from '@ai-sdk/provider';
+import type { LanguageModel } from 'ai';
 import { getKey } from '../secrets/keychain';
 import { LlmAuthError, LlmNotConfiguredError } from './errors';
 import { type QuickConfig, getQuickConfig } from './quick_config';
@@ -15,7 +15,7 @@ export function invalidateProviderCache(): void {
 	cachedConfig = undefined;
 }
 
-export async function getModel(task?: TaskName): Promise<LanguageModelV2> {
+export async function getModel(task?: TaskName): Promise<LanguageModel> {
 	const cfg = (await getQuickConfig()) ?? undefined;
 	if (!cfg) throw new LlmNotConfiguredError();
 
@@ -44,11 +44,11 @@ export async function getModel(task?: TaskName): Promise<LanguageModelV2> {
 		baseURL: endpoint,
 		apiKey: token,
 		headers,
-		supportsStructuredOutputs: true,
-		fetch: process.env.LECTERN_LLM_DEBUG === '1' ? loggingFetch : undefined
+		fetch: process.env.LECTERN_LLM_DEBUG === '1' ? loggingFetch : undefined,
+		supportsStructuredOutputs: true
 	});
 
-	return provider.chatModel(model);
+	return provider.chatModel(model) as unknown as LanguageModel;
 }
 
 const loggingFetch: typeof fetch = async (input, init) => {
@@ -67,7 +67,7 @@ export function buildModelFromValues(
 	model: string,
 	token: string,
 	headers?: Record<string, string>
-): LanguageModelV2 {
+): LanguageModel {
 	const provider = createOpenAICompatible({
 		name: 'lectern-test',
 		baseURL: endpoint,
@@ -75,7 +75,7 @@ export function buildModelFromValues(
 		headers,
 		supportsStructuredOutputs: true
 	});
-	return provider.chatModel(model);
+	return provider.chatModel(model) as unknown as LanguageModel;
 }
 
 export function getCachedConfig(): {

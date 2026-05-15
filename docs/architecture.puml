@@ -1,0 +1,1968 @@
+@startuml Diagram
+skinparam classAttributeIconSize 0
+
+top to bottom direction
+skinparam class<<component>> {
+  BackgroundColor #4A90D9
+}
+skinparam class<<store>> {
+  BackgroundColor #E67E22
+}
+skinparam class<<state>> {
+  BackgroundColor #E74C3C
+}
+skinparam class<<derived>> {
+  BackgroundColor #9B59B6
+}
+skinparam class<<page>> {
+  BackgroundColor #27AE60
+}
+skinparam class<<layout>> {
+  BackgroundColor #2ECC71
+}
+skinparam class<<PageLoad>> {
+  BackgroundColor #16A085
+}
+skinparam class<<LayoutLoad>> {
+  BackgroundColor #1ABC9C
+}
+skinparam class<<endpoint>> {
+  BackgroundColor #E74C3C
+}
+skinparam class<<error-page>> {
+  BackgroundColor #C0392B
+}
+skinparam class<<function>> {
+  BackgroundColor #3498DB
+}
+skinparam class<<Exported>> {
+  BackgroundColor #95A5A6
+}
+legend right
+  |= component |= #4A90D9 |
+  |= store |= #E67E22 |
+  |= state |= #E74C3C |
+  |= derived |= #9B59B6 |
+  |= page |= #27AE60 |
+  |= layout |= #2ECC71 |
+  |= PageLoad |= #16A085 |
+  |= LayoutLoad |= #1ABC9C |
+  |= endpoint |= #E74C3C |
+  |= error-page |= #C0392B |
+  |= function |= #3498DB |
+  |= Exported |= #95A5A6 |
+endlegend
+
+interface "SoundConfig" as SoundConfig {
+  + enabled: boolean
+  + volume: number
+  + perSoundOverrides: Partial<Record<"question_reveal" | "correct" | "wrong" | "chunk_complete" | "session_complete", { volume?: number | undefined; muted?: boolean | undefined; }>>
+}
+
+interface "DataDirLayout" as DataDirLayout {
+  + root: string
+  + db: string
+  + bundles: string
+  + exports: string
+  + logs: string
+  + pythonVenv: string
+}
+
+interface "AiTypicalPattern" as AiTypicalPattern {
+  + id: string
+  + summary: string
+  + description: string
+  + rootCause: string
+  + fileGlobs: string[]
+  + confidence: number
+}
+
+interface "BugCommitRow" as BugCommitRow {
+  + id: string
+  + repoSlug: string
+  + sha: string
+  + message: string
+  + isBugFix: boolean
+  + isRefactor: boolean
+  + blameSha: string | null
+  + patternId: string | null
+  + analyzedAt: number
+}
+
+interface "BugPatternRow" as BugPatternRow {
+  + id: string
+  + repoSlug: string
+  + summary: string
+  + rootCause: string | null
+  + fixPattern: string | null
+  + fileGlobsJson: string
+  + frequency: number
+  + confidence: number
+  + lastSeenAt: number
+  + createdAt: number
+}
+
+interface "ScanStateRow" as ScanStateRow {
+  + repoSlug: string
+  + lastScannedSha: string
+  + lastScannedAt: number
+  + totalCommitsScanned: number
+}
+
+interface "Chunk" as Chunk {
+  + id: string
+  + index: number
+  + title: string
+  + rationale: string
+  + hunks: import("src/lib/server/services/chunking/types").Hunk[]
+  + estimatedMinutes: number
+  + primaryFiles: string[]
+  + tags: ("test" | "impl")[]
+  + complexity: number
+  + languages: string[]
+  + modules: string[]
+}
+
+interface "DiffLine" as DiffLine {
+  + type: "add" | "del" | "context"
+  + content: string
+  + oldLine: number | undefined
+  + newLine: number | undefined
+}
+
+interface "Hunk" as Hunk {
+  + id: string
+  + file: string
+  + oldStart: number
+  + oldLines: number
+  + newStart: number
+  + newLines: number
+  + lines: import("src/lib/server/services/chunking/types").DiffLine[]
+  + changeType: "add" | "modify" | "delete" | "rename"
+  + renamedFrom: string | undefined
+  + binary: boolean
+  + addedLines: number
+  + removedLines: number
+}
+
+interface "CalibrationPoint" as CalibrationPoint {
+  + predicted: number
+  + actual: number
+  + count: number
+}
+
+interface "DashboardData" as DashboardData {
+  + heatmap: import("src/lib/server/services/dashboard/index").HeatmapDay[]
+  + skills: import("src/lib/server/services/dashboard/index").SkillGridItem[]
+  + repoCards: import("src/lib/server/services/dashboard/index").RepoCard[]
+  + recentSessions: import("src/lib/server/services/dashboard/index").RecentSession[]
+  + calibration: import("src/lib/server/services/dashboard/index").CalibrationPoint[]
+  + totalSessions: number
+  + totalQuestions: number
+  + overallAvgScore: number | null
+}
+
+interface "HeatmapDay" as HeatmapDay {
+  + date: string
+  + count: number
+  + avgScore: number | null
+}
+
+interface "RecentSession" as RecentSession {
+  + sessionId: string
+  + repoSlug: string
+  + state: string
+  + startedAt: number | null
+  + confidenceScore: number | null
+  + questionsAttempted: number
+  + questionsPassed: number
+}
+
+interface "RepoCard" as RepoCard {
+  + repoSlug: string
+  + totalSessions: number
+  + avgScore: number | null
+  + lastSessionAt: number | null
+  + topWeakTag: string | null
+}
+
+interface "SkillGridItem" as SkillGridItem {
+  + tag: string
+  + ewmaScore: number
+  + level: string
+  + totalAttempts: number
+  + passRate: number
+  + trend: number[]
+}
+
+interface "DebriefData" as DebriefData {
+  + sessionId: string
+  + confidenceScore: number
+  + band: "high" | "medium" | "low"
+  + recommendation: string
+  + perChunk: import("src/lib/server/services/debrief/index").PerChunkRow[]
+  + missedByTag: import("src/lib/server/services/debrief/index").MissedByTagRow[]
+  + followUps: string[]
+  + generatedAt: number
+  + selfConfidence: { questionId: string; chunkTitle: string; selfConfidence: number; computedScore: number; }[] | undefined
+  + rawSession: any
+}
+
+interface "MissedByTagRow" as MissedByTagRow {
+  + tag: string
+  + missCount: number
+  + exampleQuestionIds: string[]
+}
+
+interface "PerChunkRow" as PerChunkRow {
+  + chunkId: string
+  + title: string
+  + score: number
+  + answered: number
+  + total: number
+  + note: string
+}
+
+interface "ClickLinesPayload" as ClickLinesPayload {
+  + marked: { file: string; line: number; }[]
+}
+
+interface "CodeFixPayload" as CodeFixPayload {
+  + code: string
+}
+
+interface "FreeTextPayload" as FreeTextPayload {
+  + answer: string
+}
+
+interface "GradeArgs" as GradeArgs {
+  + sessionId: string
+  + questionId: string
+  + payload: import("src/lib/server/services/grading/index").AnswerPayload
+  + signal: AbortSignal | undefined
+}
+
+interface "MultipleChoicePayload" as MultipleChoicePayload {
+  + selectedOptionId: string
+}
+
+interface "TrueFalsePayload" as TrueFalsePayload {
+  + answer: boolean
+}
+
+interface "ComputedScore" as ComputedScore {
+  + rawScore: number
+  + verdict: "pass" | "fail" | "borderline" | "review_needed" | "skipped"
+  + confidence: number
+}
+
+interface "BundleInput" as BundleInput {
+  + parsed: ParsedPrUrl
+  + manifest: BundleManifest
+  + metadataJson: string
+  + commitsJson: string
+  + diffPatch: string
+  + files: { side: "base" | "head"; path: string; content: Buffer; }[]
+}
+
+class "UnsafeBundlePathError" as UnsafeBundlePathError {
+}
+
+class "IngestionAuthError" as IngestionAuthError {
+}
+
+interface "IngestOptions" as IngestOptions {
+  + signal: AbortSignal | undefined
+  + onProgress: ((e: IngestProgressEvent) => void) | undefined
+}
+
+interface "BundleFileEntry" as BundleFileEntry {
+  + path: string
+  + baseSize: number
+  + headSize: number
+  + binary: boolean
+  + renamed: { from: string; } | undefined
+}
+
+interface "BundleManifest" as BundleManifest {
+  + formatVersion: "1"
+  + source: { url: string; platform: "github" | "gitlab"; host: string; owner: string; repo: string; prNumber: number; fetchedAt: number; }
+  + headSha: string
+  + baseSha: string
+  + files: import("src/lib/server/services/ingestion/types").BundleFileEntry[]
+}
+
+interface "IngestProgressEvent" as IngestProgressEvent {
+  + step: "metadata" | "diff" | "commits" | "files" | "packaging" | "done" | "error"
+  + filesDone: number | undefined
+  + filesTotal: number | undefined
+  + bytesFetched: number | undefined
+  + bundleId: string | undefined
+  + kind: string | undefined
+  + message: string | undefined
+}
+
+interface "PlatformClient" as PlatformClient {
+  + fetchMetadata(parsed: ParsedPrUrl, signal: AbortSignal | undefined): Promise<import("src/lib/server/services/ingestion/types").PrMetadata>
+  + fetchDiff(parsed: ParsedPrUrl, signal: AbortSignal | undefined): Promise<string>
+  + fetchCommits(parsed: ParsedPrUrl, signal: AbortSignal | undefined): Promise<import("src/lib/server/services/ingestion/types").PrCommit[]>
+  + fetchFile(parsed: ParsedPrUrl, path: string, ref: string, signal: AbortSignal | undefined): Promise<{ content: Buffer; size: number; } | null>
+}
+
+interface "PrCommit" as PrCommit {
+  + sha: string
+  + message: string
+  + author: string
+  + date: string
+}
+
+interface "PrMetadata" as PrMetadata {
+  + title: string
+  + body: string
+  + author: string
+  + state: "open" | "closed" | "merged" | "draft"
+  + headSha: string
+  + baseSha: string
+  + headRef: string
+  + baseRef: string
+  + createdAt: string
+  + updatedAt: string
+}
+
+class "InvalidPrUrlError" as InvalidPrUrlError {
+}
+
+interface "ParsedPrUrl" as ParsedPrUrl {
+  + platform: import("src/lib/server/services/ingestion/url").Platform
+  + host: string
+  + owner: string
+  + repo: string
+  + prNumber: number
+}
+
+class "BudgetExceededError" as BudgetExceededError {
+  + httpStatus: 429
+}
+
+class "CircuitOpenError" as CircuitOpenError {
+  + httpStatus: 503
+}
+
+class "LlmAbortError" as LlmAbortError {
+  + httpStatus: 499
+}
+
+class "LlmAuthError" as LlmAuthError {
+  + httpStatus: 401
+}
+
+class "LlmNotConfiguredError" as LlmNotConfiguredError {
+  + httpStatus: 412
+}
+
+class "LlmProviderError" as LlmProviderError {
+  + httpStatus: 502
+}
+
+class "LlmRateLimitError" as LlmRateLimitError {
+  + httpStatus: 429
+}
+
+class "LlmSchemaError" as LlmSchemaError {
+  + httpStatus: 502
+}
+
+interface "RunStructuredOptions" as RunStructuredOptions {
+  + task: TaskName
+  + schema: T
+  + system: string
+  + prompt: string
+  + temperature: number | undefined
+  + signal: AbortSignal | undefined
+  + maxRetries: number | undefined
+  + sessionId: string | undefined
+}
+
+interface "StreamStructuredOptions" as StreamStructuredOptions {
+  + task: TaskName
+  + schema: T
+  + system: string
+  + prompt: string
+  + temperature: number | undefined
+  + signal: AbortSignal | undefined
+  + sessionId: string | undefined
+}
+
+interface "ChunkTitleInput" as ChunkTitleInput {
+  + chunkId: string
+  + files: string[]
+  + addedLines: number
+  + removedLines: number
+  + sampleDiff: string
+}
+
+interface "QuestionGenInput" as QuestionGenInput {
+  + chunkId: string
+  + chunkTitle: string
+  + chunkRationale: string
+  + files: string[]
+  + diff: string
+  + headFileSamples: { file: string; content: string; }[]
+  + weakTagsHint: string[] | undefined
+}
+
+interface "GradeInput" as GradeInput {
+  + prompt: string
+  + chunkDiff: string
+  + rubricJson: string
+  + userAnswer: string
+}
+
+interface "ProviderPreset" as ProviderPreset {
+  + id: string
+  + label: string
+  + endpoint: string
+  + model: string
+  + headers: Record<string, string> | undefined
+  + help: string | undefined
+}
+
+interface "TestConnectionResult" as TestConnectionResult {
+  + ok: boolean
+  + model: string | undefined
+  + latencyMs: number | undefined
+  + error: "auth" | "unreachable" | "provider" | "unknown" | undefined
+  + message: string | undefined
+}
+
+interface "SkillMasteryRow" as SkillMasteryRow {
+  + id: string
+  + tag: string
+  + repoSlug: string | null
+  + ewmaScore: number
+  + level: import("src/lib/server/services/mastery/index").MasteryLevel
+  + totalAttempts: number
+  + passCount: number
+  + lastAttemptAt: number | null
+  + lastDecayAt: number | null
+  + createdAt: number
+  + updatedAt: number
+}
+
+class "EgressViolation" as EgressViolation {
+}
+
+class "PrAgentCrashError" as PrAgentCrashError {
+}
+
+class "PrAgentParseError" as PrAgentParseError {
+}
+
+class "PrAgentSetupError" as PrAgentSetupError {
+}
+
+class "PrAgentTimeoutError" as PrAgentTimeoutError {
+}
+
+interface "RunReviewOptions" as RunReviewOptions {
+  + bundleId: string
+  + timeoutMs: number | undefined
+  + signal: AbortSignal | undefined
+}
+
+interface "PreflightResult" as PreflightResult {
+  + id: string
+  + bundleId: string
+  + headSha: string
+  + decision: import("src/lib/server/services/preflight/index").Decision
+  + counts: { blocker: number; major: number; minor: number; }
+  + findings: PrAgentReview
+  + summary: string
+  + error: { kind: string; message: string; } | undefined
+  + createdAt: number
+}
+
+interface "GenerateForChunkInput" as GenerateForChunkInput {
+  + sessionId: string
+  + bundleId: string
+  + chunk: Chunk
+  + weakTags: string[] | undefined
+}
+
+interface "RepoConventionRow" as RepoConventionRow {
+  + id: string
+  + repoSlug: string
+  + source: import("src/lib/server/services/repo_memory/index").ConventionSource
+  + filePath: string
+  + rawContent: string
+  + summary: string | null
+  + embeddingJson: string | null
+  + ingestedAt: number
+  + updatedAt: number
+}
+
+interface "WeakSpotRow" as WeakSpotRow {
+  + id: string
+  + repoSlug: string
+  + tag: string
+  + missRate: number
+  + sampleCount: number
+  + lastSeenAt: number
+  + createdAt: number
+}
+
+class "KeychainUnavailableError" as KeychainUnavailableError {
+}
+
+interface "SessionRow" as SessionRow {
+  + id: string
+  + bundleId: string
+  + headSha: string
+  + state: SessionState
+  + currentChunkIndex: number
+  + currentQuestionId: string | null
+  + startedAt: number | null
+  + lastActivityAt: number | null
+  + pausedAt: number | null
+  + resumedAt: number | null
+  + endedAt: number | null
+  + wallTimeMs: number
+  + activeTimeMs: number
+}
+
+interface "SessionSummary" as SessionSummary {
+  + session: import("src/lib/server/services/session/index").SessionRow
+  + chunks: { chunkId: string; position: number; status: string; }[]
+  + questionsByChunk: Map<string, { id: string; format: string; type: string; status: string; }[]>
+}
+
+class "IllegalSessionTransition" as IllegalSessionTransition {
+}
+
+class "config" <<state>> {
+  storeType: writable
+  valueType: unknown
+}
+
+class "OfflineBanner" <<component>> {
+}
+
+class "OnboardingBanner" <<component>> {
+}
+
+class "ClickLines" <<component>> {
+  + graded: unknown
+  + hunks: unknown
+  + onskip: unknown
+  + onsubmit: unknown
+  + question: unknown
+}
+
+class "CodeFix" <<component>> {
+  + graded: unknown
+  + onskip: unknown
+  + onsubmit: unknown
+  + question: unknown
+}
+
+class "CommandPalette" <<component>> {
+  + commands: unknown
+  + onclose: unknown
+  + open: unknown
+}
+
+class "DiffViewer" <<component>> {
+  + hunks: unknown
+}
+
+class "FreeText" <<component>> {
+  + graded: unknown
+  + onskip: unknown
+  + question: unknown
+  + sessionId: unknown
+}
+
+class "MultipleChoice" <<component>> {
+  + graded: unknown
+  + onskip: unknown
+  + onsubmit: unknown
+  + question: unknown
+}
+
+class "TrueFalse" <<component>> {
+  + graded: unknown
+  + onskip: unknown
+  + onsubmit: unknown
+  + question: unknown
+}
+
+class "+layout" <<component>> {
+  + children: unknown
+}
+
+class "+page" <<component>> {
+}
+
+class "+page" <<component>> {
+  + data: unknown
+}
+
+class "+page" <<component>> {
+}
+
+class "+page" <<component>> {
+  + data: unknown
+}
+
+class "+page" <<component>> {
+  + data: unknown
+}
+
+class "+page" <<component>> {
+  + data: unknown
+}
+
+class "+page" <<component>> {
+}
+
+class "+page" <<component>> {
+}
+
+class "+page" <<component>> {
+}
+
+class "handle" <<function>> <<Exported>> {
+}
+
+class "getOnline" <<function>> <<Exported>> {
+}
+
+class "startNetworkMonitor" <<function>> <<Exported>> {
+}
+
+class "stopNetworkMonitor" <<function>> <<Exported>> {
+}
+
+class "_resetForTesting" <<function>> <<Exported>> {
+}
+
+class "canPlay" <<function>> <<Exported>> {
+}
+
+class "ensureHowler" <<function>> <<Exported>> {
+}
+
+class "markPlayed" <<function>> <<Exported>> {
+}
+
+class "playSound" <<function>> <<Exported>> {
+}
+
+class "previewSound" <<function>> <<Exported>> {
+}
+
+class "resetConfig" <<function>> <<Exported>> {
+}
+
+class "setGlobalVolume" <<function>> <<Exported>> {
+}
+
+class "_resetForTesting" <<function>> <<Exported>> {
+}
+
+class "emit" <<function>> <<Exported>> {
+}
+
+class "subscribe" <<function>> <<Exported>> {
+}
+
+class "getEnabled" <<function>> <<Exported>> {
+}
+
+class "onToast" <<function>> <<Exported>> {
+}
+
+class "play" <<function>> <<Exported>> {
+}
+
+class "previewSound" <<function>> <<Exported>> {
+}
+
+class "resetToDefaults" <<function>> <<Exported>> {
+}
+
+class "setEnabled" <<function>> <<Exported>> {
+}
+
+class "setVolume" <<function>> <<Exported>> {
+}
+
+class "getTheme" <<function>> <<Exported>> {
+}
+
+class "setTheme" <<function>> <<Exported>> {
+}
+
+class "toggleTheme" <<function>> <<Exported>> {
+}
+
+class "dbPath" <<function>> <<Exported>> {
+}
+
+class "resolveDataDir" <<function>> <<Exported>> {
+}
+
+class "closeDb" <<function>> <<Exported>> {
+}
+
+class "getDb" <<function>> <<Exported>> {
+}
+
+class "runMigrations" <<function>> <<Exported>> {
+}
+
+class "classifyCommit" <<function>> <<Exported>> {
+}
+
+class "extractPatterns" <<function>> <<Exported>> {
+}
+
+class "getBugCommits" <<function>> <<Exported>> {
+}
+
+class "getBugPatterns" <<function>> <<Exported>> {
+}
+
+class "getScanState" <<function>> <<Exported>> {
+}
+
+class "ingestAiTypicalPatterns" <<function>> <<Exported>> {
+}
+
+class "ingestCommit" <<function>> <<Exported>> {
+}
+
+class "ingestCommits" <<function>> <<Exported>> {
+}
+
+class "ingestCommitsIncremental" <<function>> <<Exported>> {
+}
+
+class "isBugFixMessage" <<function>> <<Exported>> {
+}
+
+class "isRefactorMessage" <<function>> <<Exported>> {
+}
+
+class "loadAiTypicalCatalog" <<function>> <<Exported>> {
+}
+
+class "matchPatternsToChunk" <<function>> <<Exported>> {
+}
+
+class "szzTraceBack" <<function>> <<Exported>> {
+}
+
+class "updateScanState" <<function>> <<Exported>> {
+}
+
+class "parsePatchToHunks" <<function>> <<Exported>> {
+}
+
+class "estimateMinutes" <<function>> <<Exported>> {
+}
+
+class "groupHunksToChunks" <<function>> <<Exported>> {
+}
+
+class "isTestFile" <<function>> <<Exported>> {
+}
+
+class "stripTestSuffix" <<function>> <<Exported>> {
+}
+
+class "chunkBundle" <<function>> <<Exported>> {
+}
+
+class "generateChunkTitles" <<function>> <<Exported>> {
+}
+
+class "getDashboardData" <<function>> <<Exported>> {
+}
+
+class "getRepoProfileData" <<function>> <<Exported>> {
+}
+
+class "generateDebrief" <<function>> <<Exported>> {
+}
+
+class "borderlineFallback" <<function>> <<Exported>> {
+}
+
+class "clearGradingCache" <<function>> <<Exported>> {
+}
+
+class "codeSimilarity" <<function>> <<Exported>> {
+}
+
+class "gradeAnswer" <<function>> <<Exported>> {
+}
+
+class "gradeClickLines" <<function>> <<Exported>> {
+}
+
+class "gradeCodeFix" <<function>> <<Exported>> {
+}
+
+class "gradeMultipleChoice" <<function>> <<Exported>> {
+}
+
+class "normalizeCode" <<function>> <<Exported>> {
+}
+
+class "streamGradeFreeText" <<function>> <<Exported>> {
+}
+
+class "computeScore" <<function>> <<Exported>> {
+}
+
+class "isBinary" <<function>> <<Exported>> {
+}
+
+class "bundlePath" <<function>> <<Exported>> {
+}
+
+class "readBundleDiff" <<function>> <<Exported>> {
+}
+
+class "readBundleEntry" <<function>> <<Exported>> {
+}
+
+class "readBundleManifest" <<function>> <<Exported>> {
+}
+
+class "sanitizeBundlePath" <<function>> <<Exported>> {
+}
+
+class "writeBundle" <<function>> <<Exported>> {
+}
+
+class "getBundlePath" <<function>> <<Exported>> {
+}
+
+class "ingestFromUrl" <<function>> <<Exported>> {
+}
+
+class "validateBundleManifest" <<function>> <<Exported>> {
+}
+
+class "parsePrUrl" <<function>> <<Exported>> {
+}
+
+class "repoSlug" <<function>> <<Exported>> {
+}
+
+class "checkTokenBudget" <<function>> <<Exported>> {
+}
+
+class "getTokenUsage" <<function>> <<Exported>> {
+}
+
+class "resetCircuitBreaker" <<function>> <<Exported>> {
+}
+
+class "resetTokenUsage" <<function>> <<Exported>> {
+}
+
+class "runStructured" <<function>> <<Exported>> {
+}
+
+class "runText" <<function>> <<Exported>> {
+}
+
+class "streamStructured" <<function>> <<Exported>> {
+}
+
+class "buildUser" <<function>> <<Exported>> {
+}
+
+class "buildUser" <<function>> <<Exported>> {
+}
+
+class "buildUser" <<function>> <<Exported>> {
+}
+
+class "buildModelFromValues" <<function>> <<Exported>> {
+}
+
+class "getCachedConfig" <<function>> <<Exported>> {
+}
+
+class "getModel" <<function>> <<Exported>> {
+}
+
+class "invalidateProviderCache" <<function>> <<Exported>> {
+}
+
+class "getQuickConfig" <<function>> <<Exported>> {
+}
+
+class "setQuickConfig" <<function>> <<Exported>> {
+}
+
+class "streamObjectToSSE" <<function>> <<Exported>> {
+}
+
+class "getTaskConfig" <<function>> <<Exported>> {
+}
+
+class "getTaskOverride" <<function>> <<Exported>> {
+}
+
+class "setTaskConfig" <<function>> <<Exported>> {
+}
+
+class "testConnection" <<function>> <<Exported>> {
+}
+
+class "applyDecayToAll" <<function>> <<Exported>> {
+}
+
+class "classifyLevel" <<function>> <<Exported>> {
+}
+
+class "decayScore" <<function>> <<Exported>> {
+}
+
+class "ewma" <<function>> <<Exported>> {
+}
+
+class "getMasteryByTag" <<function>> <<Exported>> {
+}
+
+class "getMasteryForTag" <<function>> <<Exported>> {
+}
+
+class "resetAllMastery" <<function>> <<Exported>> {
+}
+
+class "resetMastery" <<function>> <<Exported>> {
+}
+
+class "updateMastery" <<function>> <<Exported>> {
+}
+
+class "updateMasteryFromSession" <<function>> <<Exported>> {
+}
+
+class "isHostAllowed" <<function>> <<Exported>> {
+}
+
+class "permitHost" <<function>> <<Exported>> {
+}
+
+class "safeFetch" <<function>> <<Exported>> {
+}
+
+class "isPrAgentAvailable" <<function>> <<Exported>> {
+}
+
+class "runReview" <<function>> <<Exported>> {
+}
+
+class "classifyFinding" <<function>> <<Exported>> {
+}
+
+class "recordOverride" <<function>> <<Exported>> {
+}
+
+class "runPreflight" <<function>> <<Exported>> {
+}
+
+class "areSimilarQuestions" <<function>> <<Exported>> {
+}
+
+class "deduplicateQuestions" <<function>> <<Exported>> {
+}
+
+class "generateQuestionsForChunk" <<function>> <<Exported>> {
+}
+
+class "tokenize" <<function>> <<Exported>> {
+}
+
+class "getConventions" <<function>> <<Exported>> {
+}
+
+class "getWeakSpots" <<function>> <<Exported>> {
+}
+
+class "ingestConvention" <<function>> <<Exported>> {
+}
+
+class "readConventionFiles" <<function>> <<Exported>> {
+}
+
+class "updateWeakSpots" <<function>> <<Exported>> {
+}
+
+class "deleteKey" <<function>> <<Exported>> {
+}
+
+class "getKey" <<function>> <<Exported>> {
+}
+
+class "hasKey" <<function>> <<Exported>> {
+}
+
+class "isFallbackActive" <<function>> <<Exported>> {
+}
+
+class "listAccounts" <<function>> <<Exported>> {
+}
+
+class "probeKeychain" <<function>> <<Exported>> {
+}
+
+class "setKey" <<function>> <<Exported>> {
+}
+
+class "crashRecovery" <<function>> <<Exported>> {
+}
+
+class "createSession" <<function>> <<Exported>> {
+}
+
+class "deleteSession" <<function>> <<Exported>> {
+}
+
+class "describeSession" <<function>> <<Exported>> {
+}
+
+class "listSessionAnswers" <<function>> <<Exported>> {
+}
+
+class "loadSession" <<function>> <<Exported>> {
+}
+
+class "recordHeartbeat" <<function>> <<Exported>> {
+}
+
+class "transition" <<function>> <<Exported>> {
+}
+
+class "nextState" <<function>> <<Exported>> {
+}
+
+class "deleteSetting" <<function>> <<Exported>> {
+}
+
+class "getSetting" <<function>> <<Exported>> {
+}
+
+class "setSetting" <<function>> <<Exported>> {
+}
+
+class "GET" <<function>> <<Exported>> {
+}
+
+class "POST" <<function>> <<Exported>> {
+}
+
+class "GET" <<function>> <<Exported>> {
+}
+
+class "DELETE" <<function>> <<Exported>> {
+}
+
+class "GET" <<function>> <<Exported>> {
+}
+
+class "POST" <<function>> <<Exported>> {
+}
+
+class "DELETE" <<function>> <<Exported>> {
+}
+
+class "POST" <<function>> <<Exported>> {
+}
+
+class "GET" <<function>> <<Exported>> {
+}
+
+class "POST" <<function>> <<Exported>> {
+}
+
+class "GET" <<function>> <<Exported>> {
+}
+
+class "DELETE" <<function>> <<Exported>> {
+}
+
+class "GET" <<function>> <<Exported>> {
+}
+
+class "POST" <<function>> <<Exported>> {
+}
+
+class "GET" <<function>> <<Exported>> {
+}
+
+class "GET" <<function>> <<Exported>> {
+}
+
+class "POST" <<function>> <<Exported>> {
+}
+
+class "POST" <<function>> <<Exported>> {
+}
+
+class "POST" <<function>> <<Exported>> {
+}
+
+class "POST" <<function>> <<Exported>> {
+}
+
+class "GET" <<function>> <<Exported>> {
+}
+
+class "GET" <<function>> <<Exported>> {
+}
+
+class "PUT" <<function>> <<Exported>> {
+}
+
+class "POST" <<function>> <<Exported>> {
+}
+
+class "load" <<function>> <<Exported>> {
+}
+
+class "load" <<function>> <<Exported>> {
+}
+
+class "load" <<function>> <<Exported>> {
+}
+
+class "load" <<function>> <<Exported>> {
+}
+
+class "+layout" as _layout <<layout>> {
+  path: /
+}
+
+class "+page" as _page_index <<page>> {
+  path: /
+}
+
+class "+server" as _server_api_chunk_bundleId <<endpoint>> {
+  path: /api/chunk/[bundleId]
+  dynamic bundleId
+}
+
+class "+server" as _server_api_dashboard <<endpoint>> {
+  path: /api/dashboard
+}
+
+class "+server" as _server_api_data_clear <<endpoint>> {
+  path: /api/data/clear
+}
+
+class "+server" as _server_api_health <<endpoint>> {
+  path: /api/health
+}
+
+class "+server" as _server_api_ingest <<endpoint>> {
+  path: /api/ingest
+}
+
+class "+server" as _server_api_keys_clear <<endpoint>> {
+  path: /api/keys/clear
+}
+
+class "+server" as _server_api_mastery_reset <<endpoint>> {
+  path: /api/mastery/reset
+}
+
+class "+server" as _server_api_preflight_bundleId <<endpoint>> {
+  path: /api/preflight/[bundleId]
+  dynamic bundleId
+}
+
+class "+server" as _server_api_repo_slug <<endpoint>> {
+  path: /api/repo/[slug]
+  dynamic slug
+}
+
+class "+server" as _server_api_sessions_id <<endpoint>> {
+  path: /api/sessions/[id]
+  dynamic id
+}
+
+class "+server" as _server_api_sessions_id_answers <<endpoint>> {
+  path: /api/sessions/[id]/answers
+  dynamic id
+}
+
+class "+server" as _server_api_sessions_id_debrief <<endpoint>> {
+  path: /api/sessions/[id]/debrief
+  dynamic id
+}
+
+class "+server" as _server_api_sessions_id_generate <<endpoint>> {
+  path: /api/sessions/[id]/generate
+  dynamic id
+}
+
+class "+server" as _server_api_sessions_id_heartbeat <<endpoint>> {
+  path: /api/sessions/[id]/heartbeat
+  dynamic id
+}
+
+class "+server" as _server_api_sessions_id_transition <<endpoint>> {
+  path: /api/sessions/[id]/transition
+  dynamic id
+}
+
+class "+server" as _server_api_sessions_create <<endpoint>> {
+  path: /api/sessions/create
+}
+
+class "+server" as _server_api_settings_llm_presets <<endpoint>> {
+  path: /api/settings/llm/presets
+}
+
+class "+server" as _server_api_settings_llm_quick <<endpoint>> {
+  path: /api/settings/llm/quick
+}
+
+class "+server" as _server_api_settings_llm_test <<endpoint>> {
+  path: /api/settings/llm/test
+}
+
+class "+page.server" as _page_server_dashboard <<PageLoad>> {
+  path: /dashboard
+}
+
+class "+page" as _page_dashboard <<page>> {
+  path: /dashboard
+}
+
+class "+page" as _page_onboarding <<page>> {
+  path: /onboarding
+}
+
+class "+page.server" as _page_server_repo_slug <<PageLoad>> {
+  path: /repo/[slug]
+  dynamic slug
+}
+
+class "+page" as _page_repo_slug <<page>> {
+  path: /repo/[slug]
+  dynamic slug
+}
+
+class "+page.server" as _page_server_session_id <<PageLoad>> {
+  path: /session/[id]
+  dynamic id
+}
+
+class "+page" as _page_session_id <<page>> {
+  path: /session/[id]
+  dynamic id
+}
+
+class "+page.server" as _page_server_session_debrief <<PageLoad>> {
+  path: /session/[id]/debrief
+  dynamic id
+}
+
+class "+page" as _page_session_debrief <<page>> {
+  path: /session/[id]/debrief
+  dynamic id
+}
+
+class "+page" as _page_settings <<page>> {
+  path: /settings
+}
+
+class "+page" as _page_settings_data <<page>> {
+  path: /settings/data
+}
+
+class "+page" as _page_settings_sound <<page>> {
+  path: /settings/sound
+}
+
+_layout --> OnboardingBanner : OnboardingBanner
+_layout --> OfflineBanner : OfflineBanner
+_page_index ..> _External_svelte : onMount
+OfflineBanner ..> _External_svelte : onMount
+OfflineBanner ..> stopNetworkMonitor : getOnline, startNetworkMonitor
+OnboardingBanner ..> _External_svelte : onMount
+OnboardingBanner ..> _External_app : page
+_page_index ..> _External_svelte : onMount
+_page_index ..> _External_svelte : onMount
+_page_index ..> _External_app : goto
+_page_index ..> _External_app : goto
+_page_index --> MultipleChoice : MultipleChoice
+_page_index --> FreeText : FreeText
+_page_index --> ClickLines : ClickLines
+_page_index --> TrueFalse : TrueFalse
+_page_index --> CodeFix : CodeFix
+_page_index --> DiffViewer : DiffViewer
+_page_index --> CommandPalette : CommandPalette
+_page_index ..> setVolume : setEnabled, getEnabled
+_page_index ..> subscribe : emit
+_page_index ..> _External_svelte : onMount
+_page_index ..> subscribe : emit
+drizzle_config_ts ..> _External_drizzle_kit : defineConfig
+tailwind_config_ts ..> _External_tailwindcss : Config
+vite_config_ts ..> _External_sveltejs_kit : sveltekit
+vite_config_ts ..> _External_vitest : defineConfig
+bin_lectern_ts ..> resolveDataDir : dbPath, resolveDataDir
+bin_lectern_ts ..> runMigrations : getDb
+bin_lectern_ts ..> setQuickConfig : getQuickConfig
+bin_lectern_ts ..> setKey : isFallbackActive, probeKeychain
+handle ..> resolveDataDir : resolveDataDir
+handle ..> setQuickConfig : getQuickConfig
+handle ..> _External_sveltejs_kit : Handle
+handle ..> _External_sveltejs_kit : redirect
+_page_server_dashboard ..> getRepoProfileData : getDashboardData
+subscribe ..> setVolume : play
+subscribe ..> SoundConfig : EVENT_SOUND_MAP, SoundEventName
+setVolume *-- setGlobalVolume : previewSound, resetConfig, setGlobalVolume, canPlay, config, ensureHowler, playSound
+setVolume ..> SoundConfig : SoundName
+resolveDataDir ..> _External_node_fs : chmodSync, existsSync, mkdirSync
+resolveDataDir ..> _External_node_path : join
+resolveDataDir ..> _External_env_paths : envPaths
+runMigrations ..> _External_better_sqlite3 : Database
+runMigrations ..> _External_drizzle_orm : drizzle
+runMigrations ..> _External_drizzle_orm : migrate
+runMigrations ..> resolveDataDir : dbPath
+runMigrations ..> src_lib_server_db_schema_index_ts
+src_lib_server_db_migrate_ts ..> runMigrations : runMigrations
+_server_api_dashboard ..> getRepoProfileData : getDashboardData
+_server_api_dashboard ..> _External_sveltejs_kit : json
+_server_api_dashboard ..> resolveDataDir : dbPath, resolveDataDir
+_server_api_dashboard ..> setQuickConfig : getQuickConfig
+_server_api_dashboard ..> _External_sveltejs_kit : json
+_server_api_dashboard ..> ingestFromUrl : IngestionAuthError, ingestFromUrl
+_server_api_dashboard ..> validateBundleManifest : IngestProgressEvent
+_server_api_dashboard ..> _External_sveltejs_kit : error
+_server_api_dashboard ..> _External_zod
+_page_server_repo_slug ..> getRepoProfileData : getRepoProfileData
+_page_server_repo_slug ..> _External_sveltejs_kit : error
+src_lib_server_db_schema_answers_ts ..> _External_drizzle_orm : index, integer, real, sqliteTable, text
+src_lib_server_db_schema_answers_ts ..> src_lib_server_db_schema_questions_ts : sessionQuestions
+src_lib_server_db_schema_answers_ts ..> src_lib_server_db_schema_sessions_ts : sessions
+src_lib_server_db_schema_app_settings_ts ..> _External_drizzle_orm : integer, sqliteTable, text
+src_lib_server_db_schema_bug_patterns_ts ..> _External_drizzle_orm : index, integer, real, sqliteTable, text
+src_lib_server_db_schema_bundles_ts ..> _External_drizzle_orm : index, integer, sqliteTable, text
+src_lib_server_db_schema_chunks_ts ..> _External_drizzle_orm : index, integer, primaryKey, sqliteTable, text
+src_lib_server_db_schema_chunks_ts ..> src_lib_server_db_schema_bundles_ts : bundles
+src_lib_server_db_schema_chunks_ts ..> src_lib_server_db_schema_sessions_ts : sessions
+src_lib_server_db_schema_debriefs_ts ..> _External_drizzle_orm : integer, real, sqliteTable, text
+src_lib_server_db_schema_debriefs_ts ..> src_lib_server_db_schema_sessions_ts : sessions
+src_lib_server_db_schema_mastery_ts ..> _External_drizzle_orm : sqliteTable, text, integer, real, uniqueIndex, index
+src_lib_server_db_schema_pr_agent_runs_ts ..> _External_drizzle_orm : integer, sqliteTable, text
+src_lib_server_db_schema_pr_agent_runs_ts ..> src_lib_server_db_schema_bundles_ts : bundles
+src_lib_server_db_schema_preflight_ts ..> _External_drizzle_orm : integer, sqliteTable, text, uniqueIndex
+src_lib_server_db_schema_preflight_ts ..> src_lib_server_db_schema_bundles_ts : bundles
+src_lib_server_db_schema_questions_ts ..> _External_drizzle_orm : index, integer, sqliteTable, text
+src_lib_server_db_schema_questions_ts ..> src_lib_server_db_schema_sessions_ts : sessions
+src_lib_server_db_schema_repo_conventions_ts ..> _External_drizzle_orm : index, integer, real, sqliteTable, text
+src_lib_server_db_schema_repo_scan_state_ts ..> _External_drizzle_orm : sqliteTable, text, integer, index
+src_lib_server_db_schema_session_activity_ts ..> _External_drizzle_orm : index, integer, real, sqliteTable, text
+src_lib_server_db_schema_sessions_ts ..> _External_drizzle_orm : integer, sqliteTable, text
+src_lib_server_db_schema_sessions_ts ..> src_lib_server_db_schema_bundles_ts : bundles
+_page_server_session_id ..> runMigrations : getDb
+_page_server_session_id ..> src_lib_server_db_schema_index_ts : chunkSets, sessions
+_page_server_session_id ..> chunkBundle : Chunk
+_page_server_session_id ..> transition : describeSession
+_page_server_session_id ..> _External_sveltejs_kit : error
+_page_server_session_id ..> _External_drizzle_orm : eq
+updateScanState ..> _External_drizzle_orm : eq
+updateScanState ..> _External_node_crypto : randomUUID
+updateScanState ..> _External_node_fs : readFileSync, existsSync
+updateScanState ..> _External_node_path : join
+updateScanState ..> runMigrations : getDb
+updateScanState ..> src_lib_server_db_schema_index_ts : bugCommits, bugPatterns, repoScanState
+updateScanState ..> updateWeakSpots : ConventionSource
+getRepoProfileData ..> _External_drizzle_orm : eq, gte
+getRepoProfileData ..> runMigrations : getDb
+getRepoProfileData ..> src_lib_server_db_schema_index_ts : sessions, answers, sessionQuestions, bundles, sessionActivity, repoCompetence, skillMastery, debriefs, repoWeakSpots, repoConventions, masteryHistory
+getRepoProfileData ..> updateMasteryFromSession : getMasteryByTag, SkillMasteryRow
+getRepoProfileData ..> updateScanState : getBugPatterns, BugPatternRow
+streamGradeFreeText ..> _External_node_crypto : randomUUID
+streamGradeFreeText ..> _External_node_crypto : createHash
+streamGradeFreeText ..> _External_drizzle_orm : eq
+streamGradeFreeText ..> runMigrations : getDb
+streamGradeFreeText ..> src_lib_server_db_schema_index_ts : answers, sessionQuestions
+streamGradeFreeText ..> streamStructured : runStructured, streamStructured
+streamGradeFreeText ..> LlmSchemaError : LlmAbortError, LlmSchemaError
+streamGradeFreeText ..> buildUser
+streamGradeFreeText ..> src_lib_server_services_llm_schemas_index_ts : GradingResult, GradingResultSchema, Question, Rubric
+streamGradeFreeText ..> computeScore : computeScore
+computeScore ..> src_lib_server_services_llm_schemas_index_ts : GradingResult, Rubric
+parsePatchToHunks ..> _External_node_crypto : createHash
+parsePatchToHunks ..> _External_parse_diff : parseDiff
+parsePatchToHunks ..> Hunk : DiffLine, Hunk
+stripTestSuffix ..> _External_node_crypto : createHash
+stripTestSuffix ..> Hunk : Chunk, Hunk
+chunkBundle ..> _External_drizzle_orm : and, eq
+chunkBundle ..> runMigrations : getDb
+chunkBundle ..> src_lib_server_db_schema_index_ts : chunkSets
+chunkBundle ..> ingestFromUrl : getBundlePath
+chunkBundle ..> writeBundle : readBundleDiff, readBundleManifest
+chunkBundle ..> parsePatchToHunks : parsePatchToHunks
+chunkBundle ..> stripTestSuffix : groupHunksToChunks
+chunkBundle ..> generateChunkTitles : generateChunkTitles
+chunkBundle ..> Hunk : Chunk
+generateChunkTitles ..> streamStructured : runStructured
+generateChunkTitles ..> buildUser
+generateChunkTitles ..> src_lib_server_services_llm_schemas_index_ts : ChunkTitleListSchema
+generateChunkTitles ..> Hunk : Chunk
+updateMasteryFromSession ..> _External_drizzle_orm : eq, and
+updateMasteryFromSession ..> _External_node_crypto : randomUUID
+updateMasteryFromSession ..> runMigrations : getDb
+updateMasteryFromSession ..> src_lib_server_db_schema_index_ts : skillMastery, masteryHistory, sessionQuestions, answers
+generateDebrief ..> _External_drizzle_orm : eq
+generateDebrief ..> runMigrations : getDb
+generateDebrief ..> src_lib_server_db_schema_index_ts : answers, chunkSets, debriefs, sessionChunks, sessionQuestions, sessions
+generateDebrief ..> src_lib_server_services_llm_schemas_index_ts : Question
+writeBundle ..> _External_node_fs : createWriteStream
+writeBundle ..> _External_node_fs : mkdir, rm, stat, writeFile
+writeBundle ..> _External_node_path : dirname, isAbsolute, join, normalize, sep
+writeBundle ..> _External_node_stream : pipeline
+writeBundle ..> _External_tar
+writeBundle ..> resolveDataDir : resolveDataDir
+writeBundle ..> validateBundleManifest : BundleManifest
+writeBundle ..> validateBundleManifest : validateBundleManifest
+writeBundle ..> repoSlug : ParsedPrUrl
+writeBundle ..> repoSlug : repoSlug
+src_lib_server_services_ingestion_github_ts ..> _External_octokit_rest : Octokit
+src_lib_server_services_ingestion_github_ts ..> setKey : getKey
+src_lib_server_services_ingestion_github_ts ..> validateBundleManifest : PlatformClient, PrCommit, PrMetadata
+src_lib_server_services_ingestion_github_ts ..> repoSlug : ParsedPrUrl
+src_lib_server_services_ingestion_gitlab_ts ..> validateBundleManifest : PlatformClient, PrMetadata, PrCommit
+src_lib_server_services_ingestion_gitlab_ts ..> repoSlug : ParsedPrUrl
+src_lib_server_services_ingestion_gitlab_ts ..> setKey : getKey
+ingestFromUrl ..> _External_drizzle_orm : eq
+ingestFromUrl ..> _External_parse_diff : parseDiff
+ingestFromUrl ..> _External_node_crypto : randomUUID
+ingestFromUrl ..> runMigrations : getDb
+ingestFromUrl ..> src_lib_server_db_schema_index_ts : bundles
+ingestFromUrl ..> isBinary : isBinary
+ingestFromUrl ..> writeBundle : writeBundle, bundlePath
+ingestFromUrl ..> src_lib_server_services_ingestion_github_ts : githubClient
+ingestFromUrl ..> src_lib_server_services_ingestion_gitlab_ts : gitlabClient
+ingestFromUrl ..> validateBundleManifest : BundleFileEntry, BundleManifest, IngestProgressEvent, PlatformClient
+ingestFromUrl ..> repoSlug : parsePrUrl, repoSlug, ParsedPrUrl
+validateBundleManifest ..> _External_zod
+validateBundleManifest ..> repoSlug : ParsedPrUrl
+streamStructured ..> _External_ai : generateObject, generateText, streamObject
+streamStructured ..> _External_drizzle_orm : eq
+streamStructured ..> _External_zod
+streamStructured ..> runMigrations : getDb
+streamStructured ..> src_lib_server_db_schema_index_ts : appSettings
+streamStructured ..> LlmSchemaError : BudgetExceededError, CircuitOpenError, LlmAbortError, LlmAuthError, LlmProviderError, LlmRateLimitError, LlmSchemaError
+streamStructured ..> invalidateProviderCache : getModel
+streamStructured ..> src_lib_server_services_llm_tasks_ts : TaskName
+invalidateProviderCache ..> _External_ai_sdk_openai_compatible : createOpenAICompatible
+invalidateProviderCache ..> _External_ai : LanguageModelV1
+invalidateProviderCache ..> setKey : getKey
+invalidateProviderCache ..> LlmSchemaError : LlmAuthError, LlmNotConfiguredError
+invalidateProviderCache ..> setQuickConfig : QuickConfig, getQuickConfig
+invalidateProviderCache ..> setTaskConfig : getTaskOverride
+invalidateProviderCache ..> src_lib_server_services_llm_tasks_ts : TaskName
+setQuickConfig ..> _External_zod
+setQuickConfig ..> safeFetch : permitHost
+setQuickConfig ..> setSetting : getSetting, setSetting
+setTaskConfig ..> _External_zod
+setTaskConfig ..> setSetting : getSetting, setSetting
+setTaskConfig ..> src_lib_server_services_llm_tasks_ts : TaskName
+testConnection ..> _External_ai : generateText
+testConnection ..> _External_zod
+testConnection ..> safeFetch : isHostAllowed, permitHost
+testConnection ..> LlmSchemaError : LlmAuthError, LlmProviderError
+testConnection ..> invalidateProviderCache : buildModelFromValues
+updateWeakSpots ..> _External_drizzle_orm : eq
+updateWeakSpots ..> _External_node_crypto : randomUUID
+updateWeakSpots ..> _External_node_fs : readFile, stat
+updateWeakSpots ..> _External_node_path : join
+updateWeakSpots ..> runMigrations : getDb
+updateWeakSpots ..> src_lib_server_db_schema_index_ts : repoConventions, repoWeakSpots, sessionQuestions, answers, sessions, bundles
+runReview ..> _External_node_crypto : randomUUID
+runReview ..> _External_node_fs : existsSync
+runReview ..> _External_node_path : join
+runReview ..> _External_drizzle_orm : eq
+runReview ..> _External_execa : execa
+runReview ..> _External_zod
+runReview ..> resolveDataDir : resolveDataDir
+runReview ..> runMigrations : getDb
+runReview ..> src_lib_server_db_schema_index_ts : bundles, prAgentRuns
+runReview ..> setKey : getKey
+setKey ..> _External_node_crypto : createCipheriv, createDecipheriv, randomBytes
+setKey ..> _External_node_fs : existsSync, mkdirSync, readFileSync, writeFileSync
+setKey ..> _External_node_path : join
+setKey ..> resolveDataDir : resolveDataDir
+setKey ..> _External_keytar : keytar
+transition ..> _External_node_crypto : randomUUID
+transition ..> _External_drizzle_orm : and, eq
+transition ..> runMigrations : getDb
+transition ..> src_lib_server_db_schema_index_ts : answers, bundles, sessionChunks, sessionQuestions, sessions
+transition ..> chunkBundle : chunkBundle
+transition ..> tokenize : generateQuestionsForChunk
+transition ..> nextState : SessionEvent, SessionState, nextState
+runPreflight ..> _External_node_crypto : randomUUID
+runPreflight ..> _External_drizzle_orm : and, eq
+runPreflight ..> runMigrations : getDb
+runPreflight ..> src_lib_server_db_schema_index_ts : bundles, preflightOverrides, preflightResults
+runPreflight ..> runReview : PrAgentCrashError, PrAgentParseError, PrAgentReview, PrAgentSetupError, PrAgentTimeoutError, isPrAgentAvailable, runReview
+runPreflight ..> writeBundle : readBundleManifest
+_server_api_chunk_bundleId ..> chunkBundle : chunkBundle
+_server_api_chunk_bundleId ..> _External_sveltejs_kit : error, json
+setSetting ..> _External_drizzle_orm : eq
+setSetting ..> runMigrations : getDb
+setSetting ..> src_lib_server_db_schema_index_ts : appSettings
+tokenize ..> _External_drizzle_orm : eq
+tokenize ..> runMigrations : getDb
+tokenize ..> src_lib_server_db_schema_index_ts : sessionQuestions
+tokenize ..> chunkBundle : Chunk
+tokenize ..> ingestFromUrl : getBundlePath
+tokenize ..> writeBundle : readBundleEntry
+tokenize ..> streamStructured : runStructured
+tokenize ..> LlmSchemaError : LlmSchemaError
+tokenize ..> buildUser
+tokenize ..> src_lib_server_services_llm_schemas_index_ts : Question, QuestionListSchema
+_server_api_preflight_bundleId ..> runPreflight : recordOverride, runPreflight
+_server_api_preflight_bundleId ..> _External_sveltejs_kit : error, json
+_server_api_preflight_bundleId ..> _External_sveltejs_kit : json
+_server_api_preflight_bundleId ..> updateMasteryFromSession : resetMastery, resetAllMastery
+_server_api_data_clear ..> runMigrations : getDb
+_server_api_data_clear ..> src_lib_server_db_schema_index_ts : answers, debriefs, sessionActivity, sessions
+_server_api_health ..> _External_sveltejs_kit : json
+_server_api_keys_clear ..> setKey : deleteKey, listAccounts
+_server_api_keys_clear ..> _External_sveltejs_kit : json
+_server_api_ingest ..> ingestFromUrl : IngestionAuthError, ingestFromUrl
+_server_api_ingest ..> transition : createSession
+_server_api_ingest ..> _External_sveltejs_kit : error, json, redirect
+_server_api_ingest ..> _External_zod
+_server_api_repo_slug ..> getRepoProfileData : getRepoProfileData
+_server_api_repo_slug ..> _External_sveltejs_kit : json
+_server_api_repo_slug ..> runMigrations : getDb
+_server_api_repo_slug ..> src_lib_server_db_schema_index_ts : chunkSets, sessionQuestions, sessions
+_server_api_repo_slug ..> transition : deleteSession, describeSession, listSessionAnswers
+_server_api_repo_slug ..> _External_sveltejs_kit : error, json
+_server_api_repo_slug ..> _External_drizzle_orm : eq
+src_lib_server_services_llm_schemas_chunk_ts ..> _External_zod
+src_lib_server_services_llm_schemas_grade_ts ..> _External_zod
+src_lib_server_services_llm_schemas_question_ts ..> _External_zod
+src_lib_server_services_llm_schemas_question_ts ..> src_lib_server_services_llm_schemas_rubric_ts : RubricSchema
+src_lib_server_services_llm_schemas_rubric_ts ..> _External_zod
+_server_api_settings_llm_presets ..> invalidateProviderCache : invalidateProviderCache
+_server_api_settings_llm_presets ..> setQuickConfig : QuickConfigSchema, getQuickConfig, setQuickConfig
+_server_api_settings_llm_presets ..> setKey : hasKey, setKey
+_server_api_settings_llm_presets ..> _External_sveltejs_kit : error, json
+_server_api_settings_llm_presets ..> _External_zod
+_page_server_session_debrief ..> runMigrations : getDb
+_page_server_session_debrief ..> src_lib_server_db_schema_index_ts : sessions
+_page_server_session_debrief ..> _External_sveltejs_kit : error
+_page_server_session_debrief ..> _External_drizzle_orm : eq
+_server_api_sessions_id_answers ..> setQuickConfig : PROVIDER_PRESETS
+_server_api_sessions_id_answers ..> _External_sveltejs_kit : json
+_server_api_sessions_id_answers ..> testConnection : TestConnectionRequestSchema, testConnection
+_server_api_sessions_id_answers ..> _External_sveltejs_kit : error, json
+_server_api_sessions_id_answers ..> streamGradeFreeText : gradeAnswer, streamGradeFreeText
+_server_api_sessions_id_answers ..> _External_sveltejs_kit : error, json
+_server_api_sessions_id_answers ..> _External_zod
+_server_api_sessions_id_debrief ..> generateDebrief : generateDebrief
+_server_api_sessions_id_debrief ..> _External_sveltejs_kit : error, json
+_server_api_sessions_id_heartbeat ..> transition : recordHeartbeat
+_server_api_sessions_id_heartbeat ..> _External_sveltejs_kit : error, json
+_server_api_sessions_id_transition ..> transition : transition
+_server_api_sessions_id_transition ..> nextState : IllegalSessionTransition
+_server_api_sessions_id_transition ..> _External_sveltejs_kit : error, json
+_server_api_sessions_id_transition ..> _External_zod
+_server_api_sessions_id_generate ..> runMigrations : getDb
+_server_api_sessions_id_generate ..> src_lib_server_db_schema_index_ts : chunkSets, sessionQuestions, sessions
+_server_api_sessions_id_generate ..> chunkBundle : Chunk
+_server_api_sessions_id_generate ..> tokenize : generateQuestionsForChunk
+_server_api_sessions_id_generate ..> _External_sveltejs_kit : error, json
+_server_api_sessions_id_generate ..> _External_drizzle_orm : eq
+_server_api_sessions_id_generate ..> _External_zod
+svelte_config_js ..> _External_sveltejs_adapter_node : adapter
+svelte_config_js ..> _External_sveltejs_vite_plugin_svelte : vitePreprocess
+build_env_js ..> _External_node_process : process
+build_handler_js ..> build_shims_js
+build_handler_js ..> _External_node_fs
+build_handler_js ..> _External_node_fs : fs__default, readdirSync, statSync, createReadStream
+build_handler_js ..> _External_node_path : path, resolve, join, sep, normalize
+build_handler_js ..> _External_node_process : process
+build_handler_js ..> _External_node_querystring
+build_handler_js ..> _External_node_url : fileURLToPath
+build_handler_js ..> _External_node_stream : Readable
+build_handler_js ..> build_server_index_js : Server
+build_handler_js ..> build_server_manifest_js : manifest, prerendered, base
+build_handler_js ..> build_env_js : env
+build_index_js ..> _External_node_http : http
+build_index_js ..> _External_node_process : process
+build_index_js ..> build_handler_js : handler
+build_index_js ..> build_env_js : env, timeout_env
+build_index_js ..> _External_node_timers : setImmediate
+build_index_js ..> _External_node_querystring
+build_shims_js ..> _External_node_buffer : buffer
+build_shims_js ..> _External_node_crypto : webcrypto
+build_server_index_js ..> build_server_chunks_index_NcxaM188_js : H, S, R, A
+build_server_index_js ..> build_server_chunks_root_P0jlv39K_js : B
+build_server_index_js ..> build_server_chunks_renderer_BPdJ79w3_js : D
+build_server_index_js ..> build_server_chunks_index_B5clDjd_js
+build_server_chunks_4_Bv2L7vhM_js ..> build_server_chunks_index_NcxaM188_js
+build_server_chunks_4_Bv2L7vhM_js ..> _External_drizzle_orm : eq
+build_server_chunks_4_Bv2L7vhM_js ..> build_server_chunks_index4_DmwLspgx_js
+build_server_chunks_4_Bv2L7vhM_js ..> build_server_chunks_index2_B_QGK2lq_js
+build_server_chunks_4_Bv2L7vhM_js ..> _External_node_crypto
+build_server_chunks_4_Bv2L7vhM_js ..> build_server_chunks_index3_CcwdkUJm_js
+build_server_chunks_4_Bv2L7vhM_js ..> _External_parse_diff
+build_server_chunks_4_Bv2L7vhM_js ..> _External_node_fs
+build_server_chunks_4_Bv2L7vhM_js ..> _External_node_path
+build_server_chunks_4_Bv2L7vhM_js ..> _External_node_stream
+build_server_chunks_4_Bv2L7vhM_js ..> _External_tar
+build_server_chunks_4_Bv2L7vhM_js ..> _External_octokit_rest
+build_server_chunks_4_Bv2L7vhM_js ..> build_server_chunks_keychain_U_hXKHtG_js
+build_server_chunks_4_Bv2L7vhM_js ..> _External_keytar
+build_server_chunks_4_Bv2L7vhM_js ..> build_server_chunks_chunk_CTpKBVTY_js
+build_server_chunks_4_Bv2L7vhM_js ..> _External_ai
+build_server_chunks_4_Bv2L7vhM_js ..> build_server_chunks_provider_B_1Qpqf9_js
+build_server_chunks_4_Bv2L7vhM_js ..> _External_ai_sdk_openai_compatible
+build_server_chunks_4_Bv2L7vhM_js ..> build_server_chunks_quick_config_HhaVP9p_js
+build_server_chunks_4_Bv2L7vhM_js ..> _External_zod
+build_server_chunks_4_Bv2L7vhM_js ..> _External_better_sqlite3
+build_server_chunks_4_Bv2L7vhM_js ..> _External_drizzle_orm
+build_server_chunks_4_Bv2L7vhM_js ..> _External_env_paths
+build_server_chunks_layout_svelte_DEe2ck8R_js ..> build_server_chunks_renderer_BPdJ79w3_js
+build_server_chunks_page_svelte_CExD15q0_js ..> build_server_chunks_renderer_BPdJ79w3_js
+build_server_chunks_page_svelte_CExD15q0_js ..> build_server_chunks_root_P0jlv39K_js
+build_server_chunks_page_svelte_CExD15q0_js ..> build_server_chunks_state_svelte_CXcvfGLU_js
+build_server_chunks_page_svelte_CTWAIvOb_js ..> build_server_chunks_renderer_BPdJ79w3_js
+build_server_chunks_page_svelte_CTWAIvOb_js ..> build_server_chunks_root_P0jlv39K_js
+build_server_chunks_page_svelte_CTWAIvOb_js ..> build_server_chunks_state_svelte_CXcvfGLU_js
+build_server_chunks_page_svelte_DRz30Wh2_js ..> build_server_chunks_root_P0jlv39K_js
+build_server_chunks_page_svelte_DRz30Wh2_js ..> build_server_chunks_state_svelte_CXcvfGLU_js
+build_server_chunks_page_svelte_DRz30Wh2_js ..> build_server_chunks_renderer_BPdJ79w3_js
+build_server_chunks_server_ts_3_EnAru_js ..> build_server_chunks_index_NcxaM188_js
+build_server_chunks_server_ts_3_EnAru_js ..> build_server_chunks_index4_DmwLspgx_js
+build_server_chunks_server_ts_3_EnAru_js ..> _External_drizzle_orm
+build_server_chunks_server_ts_3_EnAru_js ..> _External_node_crypto
+build_server_chunks_server_ts_3_EnAru_js ..> build_server_chunks_index2_B_QGK2lq_js
+build_server_chunks_server_ts_3_EnAru_js ..> _External_better_sqlite3
+build_server_chunks_server_ts_3_EnAru_js ..> _External_env_paths
+build_server_chunks_server_ts_3_EnAru_js ..> _External_node_fs
+build_server_chunks_server_ts_3_EnAru_js ..> _External_node_path
+build_server_chunks_server_ts_3_EnAru_js ..> build_server_chunks_index3_CcwdkUJm_js
+build_server_chunks_server_ts_3_EnAru_js ..> _External_parse_diff
+build_server_chunks_server_ts_3_EnAru_js ..> _External_node_stream
+build_server_chunks_server_ts_3_EnAru_js ..> _External_tar
+build_server_chunks_server_ts_3_EnAru_js ..> _External_octokit_rest
+build_server_chunks_server_ts_3_EnAru_js ..> build_server_chunks_keychain_U_hXKHtG_js
+build_server_chunks_server_ts_3_EnAru_js ..> _External_keytar
+build_server_chunks_server_ts_3_EnAru_js ..> build_server_chunks_chunk_CTpKBVTY_js
+build_server_chunks_server_ts_3_EnAru_js ..> _External_ai
+build_server_chunks_server_ts_3_EnAru_js ..> build_server_chunks_provider_B_1Qpqf9_js
+build_server_chunks_server_ts_3_EnAru_js ..> _External_ai_sdk_openai_compatible
+build_server_chunks_server_ts_3_EnAru_js ..> build_server_chunks_quick_config_HhaVP9p_js
+build_server_chunks_server_ts_3_EnAru_js ..> _External_zod
+build_server_chunks_server_ts_CLk7_Phr_js ..> build_server_chunks_index_NcxaM188_js
+build_server_chunks_server_ts_CLk7_Phr_js ..> _External_zod
+build_server_chunks_server_ts_CLk7_Phr_js ..> build_server_chunks_quick_config_HhaVP9p_js : Q
+build_server_chunks_server_ts_CLk7_Phr_js ..> build_server_chunks_keychain_U_hXKHtG_js
+build_server_chunks_server_ts_CLk7_Phr_js ..> _External_drizzle_orm
+build_server_chunks_server_ts_CLk7_Phr_js ..> build_server_chunks_index2_B_QGK2lq_js
+build_server_chunks_server_ts_CLk7_Phr_js ..> _External_better_sqlite3
+build_server_chunks_server_ts_CLk7_Phr_js ..> _External_env_paths
+build_server_chunks_server_ts_CLk7_Phr_js ..> _External_node_fs
+build_server_chunks_server_ts_CLk7_Phr_js ..> _External_node_path
+build_server_chunks_server_ts_CLk7_Phr_js ..> _External_keytar
+build_server_chunks_server_ts_CNqUc1OM_js ..> build_server_chunks_index_NcxaM188_js
+build_server_chunks_server_ts_CNqUc1OM_js ..> _External_zod
+build_server_chunks_server_ts_CNqUc1OM_js ..> _External_drizzle_orm : eq
+build_server_chunks_server_ts_CNqUc1OM_js ..> _External_node_crypto : randomUUID
+build_server_chunks_server_ts_CNqUc1OM_js ..> build_server_chunks_index2_B_QGK2lq_js
+build_server_chunks_server_ts_CNqUc1OM_js ..> build_server_chunks_chunk_CTpKBVTY_js : G
+build_server_chunks_server_ts_CNqUc1OM_js ..> build_server_chunks_provider_B_1Qpqf9_js : L
+build_server_chunks_server_ts_CNqUc1OM_js ..> _External_better_sqlite3
+build_server_chunks_server_ts_CNqUc1OM_js ..> _External_drizzle_orm
+build_server_chunks_server_ts_CNqUc1OM_js ..> _External_env_paths
+build_server_chunks_server_ts_CNqUc1OM_js ..> _External_node_fs
+build_server_chunks_server_ts_CNqUc1OM_js ..> _External_node_path
+build_server_chunks_server_ts_CNqUc1OM_js ..> _External_ai
+build_server_chunks_server_ts_CNqUc1OM_js ..> _External_ai_sdk_openai_compatible
+build_server_chunks_server_ts_CNqUc1OM_js ..> build_server_chunks_quick_config_HhaVP9p_js
+build_server_chunks_server_ts_CNqUc1OM_js ..> build_server_chunks_keychain_U_hXKHtG_js
+build_server_chunks_server_ts_CNqUc1OM_js ..> _External_keytar
+build_server_chunks_server_ts_CaV_Vxtv_js ..> build_server_chunks_index_NcxaM188_js
+build_server_chunks_server_ts_CaV_Vxtv_js ..> _External_zod
+build_server_chunks_server_ts_CaV_Vxtv_js ..> build_server_chunks_index4_DmwLspgx_js : I
+build_server_chunks_server_ts_CaV_Vxtv_js ..> _External_drizzle_orm
+build_server_chunks_server_ts_CaV_Vxtv_js ..> _External_node_crypto
+build_server_chunks_server_ts_CaV_Vxtv_js ..> build_server_chunks_index2_B_QGK2lq_js
+build_server_chunks_server_ts_CaV_Vxtv_js ..> _External_better_sqlite3
+build_server_chunks_server_ts_CaV_Vxtv_js ..> _External_env_paths
+build_server_chunks_server_ts_CaV_Vxtv_js ..> _External_node_fs
+build_server_chunks_server_ts_CaV_Vxtv_js ..> _External_node_path
+build_server_chunks_server_ts_CaV_Vxtv_js ..> build_server_chunks_index3_CcwdkUJm_js
+build_server_chunks_server_ts_CaV_Vxtv_js ..> _External_parse_diff
+build_server_chunks_server_ts_CaV_Vxtv_js ..> _External_node_stream
+build_server_chunks_server_ts_CaV_Vxtv_js ..> _External_tar
+build_server_chunks_server_ts_CaV_Vxtv_js ..> _External_octokit_rest
+build_server_chunks_server_ts_CaV_Vxtv_js ..> build_server_chunks_keychain_U_hXKHtG_js
+build_server_chunks_server_ts_CaV_Vxtv_js ..> _External_keytar
+build_server_chunks_server_ts_CaV_Vxtv_js ..> build_server_chunks_chunk_CTpKBVTY_js
+build_server_chunks_server_ts_CaV_Vxtv_js ..> _External_ai
+build_server_chunks_server_ts_CaV_Vxtv_js ..> build_server_chunks_provider_B_1Qpqf9_js
+build_server_chunks_server_ts_CaV_Vxtv_js ..> _External_ai_sdk_openai_compatible
+build_server_chunks_server_ts_CaV_Vxtv_js ..> build_server_chunks_quick_config_HhaVP9p_js
+build_server_chunks_server_ts_CvwltEJ5_js ..> build_server_chunks_index_NcxaM188_js
+build_server_chunks_server_ts_CvwltEJ5_js ..> _External_zod
+build_server_chunks_server_ts_CvwltEJ5_js ..> build_server_chunks_index3_CcwdkUJm_js : I
+build_server_chunks_server_ts_CvwltEJ5_js ..> build_server_chunks_index4_DmwLspgx_js
+build_server_chunks_server_ts_CvwltEJ5_js ..> _External_drizzle_orm
+build_server_chunks_server_ts_CvwltEJ5_js ..> _External_parse_diff
+build_server_chunks_server_ts_CvwltEJ5_js ..> _External_node_crypto
+build_server_chunks_server_ts_CvwltEJ5_js ..> build_server_chunks_index2_B_QGK2lq_js
+build_server_chunks_server_ts_CvwltEJ5_js ..> _External_better_sqlite3
+build_server_chunks_server_ts_CvwltEJ5_js ..> _External_env_paths
+build_server_chunks_server_ts_CvwltEJ5_js ..> _External_node_fs
+build_server_chunks_server_ts_CvwltEJ5_js ..> _External_node_path
+build_server_chunks_server_ts_CvwltEJ5_js ..> _External_node_stream
+build_server_chunks_server_ts_CvwltEJ5_js ..> _External_tar
+build_server_chunks_server_ts_CvwltEJ5_js ..> _External_octokit_rest
+build_server_chunks_server_ts_CvwltEJ5_js ..> build_server_chunks_keychain_U_hXKHtG_js
+build_server_chunks_server_ts_CvwltEJ5_js ..> _External_keytar
+build_server_chunks_server_ts_CvwltEJ5_js ..> build_server_chunks_chunk_CTpKBVTY_js
+build_server_chunks_server_ts_CvwltEJ5_js ..> _External_ai
+build_server_chunks_server_ts_CvwltEJ5_js ..> build_server_chunks_provider_B_1Qpqf9_js
+build_server_chunks_server_ts_CvwltEJ5_js ..> _External_ai_sdk_openai_compatible
+build_server_chunks_server_ts_CvwltEJ5_js ..> build_server_chunks_quick_config_HhaVP9p_js
+build_server_chunks_server_ts_D2aPP8mR_js ..> build_server_chunks_index_NcxaM188_js
+build_server_chunks_server_ts_D2aPP8mR_js ..> build_server_chunks_quick_config_HhaVP9p_js : P
+build_server_chunks_server_ts_D2aPP8mR_js ..> _External_zod
+build_server_chunks_server_ts_D2aPP8mR_js ..> _External_drizzle_orm
+build_server_chunks_server_ts_D2aPP8mR_js ..> build_server_chunks_index2_B_QGK2lq_js
+build_server_chunks_server_ts_D2aPP8mR_js ..> _External_better_sqlite3
+build_server_chunks_server_ts_D2aPP8mR_js ..> _External_env_paths
+build_server_chunks_server_ts_D2aPP8mR_js ..> _External_node_fs
+build_server_chunks_server_ts_D2aPP8mR_js ..> _External_node_path
+build_server_chunks_server_ts_D9TZWbRN_js ..> build_server_chunks_index_NcxaM188_js
+build_server_chunks_server_ts_D9TZWbRN_js ..> _External_drizzle_orm : eq, and
+build_server_chunks_server_ts_D9TZWbRN_js ..> _External_node_crypto : randomUUID
+build_server_chunks_server_ts_D9TZWbRN_js ..> build_server_chunks_index2_B_QGK2lq_js
+build_server_chunks_server_ts_D9TZWbRN_js ..> _External_execa : execa
+build_server_chunks_server_ts_D9TZWbRN_js ..> _External_node_fs : existsSync
+build_server_chunks_server_ts_D9TZWbRN_js ..> _External_node_path : join
+build_server_chunks_server_ts_D9TZWbRN_js ..> _External_zod
+build_server_chunks_server_ts_D9TZWbRN_js ..> build_server_chunks_keychain_U_hXKHtG_js
+build_server_chunks_server_ts_D9TZWbRN_js ..> _External_better_sqlite3
+build_server_chunks_server_ts_D9TZWbRN_js ..> _External_drizzle_orm
+build_server_chunks_server_ts_D9TZWbRN_js ..> _External_env_paths
+build_server_chunks_server_ts_D9TZWbRN_js ..> _External_keytar
+build_server_chunks_server_ts_DJH6_upj_js ..> build_server_chunks_index_NcxaM188_js
+build_server_chunks_server_ts_DJH6_upj_js ..> build_server_chunks_index2_B_QGK2lq_js
+build_server_chunks_server_ts_DJH6_upj_js ..> build_server_chunks_quick_config_HhaVP9p_js
+build_server_chunks_server_ts_DJH6_upj_js ..> _External_better_sqlite3
+build_server_chunks_server_ts_DJH6_upj_js ..> _External_drizzle_orm
+build_server_chunks_server_ts_DJH6_upj_js ..> _External_env_paths
+build_server_chunks_server_ts_DJH6_upj_js ..> _External_node_fs
+build_server_chunks_server_ts_DJH6_upj_js ..> _External_node_path
+build_server_chunks_server_ts_DJH6_upj_js ..> _External_zod
+build_server_chunks_server_ts_cjXMhvga_js ..> build_server_chunks_index_NcxaM188_js
+build_server_chunks_server_ts_cjXMhvga_js ..> _External_ai : generateText
+build_server_chunks_server_ts_cjXMhvga_js ..> _External_zod
+build_server_chunks_server_ts_cjXMhvga_js ..> build_server_chunks_provider_B_1Qpqf9_js
+build_server_chunks_server_ts_cjXMhvga_js ..> build_server_chunks_quick_config_HhaVP9p_js
+build_server_chunks_server_ts_cjXMhvga_js ..> _External_ai_sdk_openai_compatible
+build_server_chunks_server_ts_cjXMhvga_js ..> build_server_chunks_keychain_U_hXKHtG_js
+build_server_chunks_server_ts_cjXMhvga_js ..> _External_keytar
+build_server_chunks_server_ts_cjXMhvga_js ..> _External_drizzle_orm
+build_server_chunks_server_ts_cjXMhvga_js ..> build_server_chunks_index2_B_QGK2lq_js
+build_server_chunks_server_ts_cjXMhvga_js ..> _External_better_sqlite3
+build_server_chunks_server_ts_cjXMhvga_js ..> _External_env_paths
+build_server_chunks_server_ts_cjXMhvga_js ..> _External_node_fs
+build_server_chunks_server_ts_cjXMhvga_js ..> _External_node_path
+build_server_chunks_server_ts_cyLd5iCZ_js ..> build_server_chunks_index_NcxaM188_js
+build_server_chunks_server_ts_cyLd5iCZ_js ..> _External_drizzle_orm : eq
+build_server_chunks_server_ts_cyLd5iCZ_js ..> build_server_chunks_index2_B_QGK2lq_js
+build_server_chunks_server_ts_cyLd5iCZ_js ..> _External_better_sqlite3
+build_server_chunks_server_ts_cyLd5iCZ_js ..> _External_drizzle_orm
+build_server_chunks_server_ts_cyLd5iCZ_js ..> _External_env_paths
+build_server_chunks_server_ts_cyLd5iCZ_js ..> _External_node_fs
+build_server_chunks_server_ts_cyLd5iCZ_js ..> _External_node_path
+build_server_chunks_server_ts_pr_VG0Q_js ..> build_server_chunks_index_NcxaM188_js
+build_server_chunks_server_ts_pr_VG0Q_js ..> _External_zod
+build_server_chunks_server_ts_pr_VG0Q_js ..> build_server_chunks_index3_CcwdkUJm_js : I
+build_server_chunks_server_ts_pr_VG0Q_js ..> _External_drizzle_orm
+build_server_chunks_server_ts_pr_VG0Q_js ..> _External_parse_diff
+build_server_chunks_server_ts_pr_VG0Q_js ..> _External_node_crypto
+build_server_chunks_server_ts_pr_VG0Q_js ..> build_server_chunks_index2_B_QGK2lq_js
+build_server_chunks_server_ts_pr_VG0Q_js ..> _External_better_sqlite3
+build_server_chunks_server_ts_pr_VG0Q_js ..> _External_env_paths
+build_server_chunks_server_ts_pr_VG0Q_js ..> _External_node_fs
+build_server_chunks_server_ts_pr_VG0Q_js ..> _External_node_path
+build_server_chunks_server_ts_pr_VG0Q_js ..> _External_node_stream
+build_server_chunks_server_ts_pr_VG0Q_js ..> _External_tar
+build_server_chunks_server_ts_pr_VG0Q_js ..> _External_octokit_rest
+build_server_chunks_server_ts_pr_VG0Q_js ..> build_server_chunks_keychain_U_hXKHtG_js
+build_server_chunks_server_ts_pr_VG0Q_js ..> _External_keytar
+build_server_chunks_server_ts_qMAZ_E69_js ..> build_server_chunks_index_NcxaM188_js
+build_server_chunks_server_ts_qMAZ_E69_js ..> _External_drizzle_orm : eq
+build_server_chunks_server_ts_qMAZ_E69_js ..> build_server_chunks_index4_DmwLspgx_js
+build_server_chunks_server_ts_qMAZ_E69_js ..> build_server_chunks_index2_B_QGK2lq_js
+build_server_chunks_server_ts_qMAZ_E69_js ..> _External_node_crypto
+build_server_chunks_server_ts_qMAZ_E69_js ..> build_server_chunks_index3_CcwdkUJm_js
+build_server_chunks_server_ts_qMAZ_E69_js ..> _External_parse_diff
+build_server_chunks_server_ts_qMAZ_E69_js ..> _External_node_fs
+build_server_chunks_server_ts_qMAZ_E69_js ..> _External_node_path
+build_server_chunks_server_ts_qMAZ_E69_js ..> _External_node_stream
+build_server_chunks_server_ts_qMAZ_E69_js ..> _External_tar
+build_server_chunks_server_ts_qMAZ_E69_js ..> _External_octokit_rest
+build_server_chunks_server_ts_qMAZ_E69_js ..> build_server_chunks_keychain_U_hXKHtG_js
+build_server_chunks_server_ts_qMAZ_E69_js ..> _External_keytar
+build_server_chunks_server_ts_qMAZ_E69_js ..> build_server_chunks_chunk_CTpKBVTY_js
+build_server_chunks_server_ts_qMAZ_E69_js ..> _External_ai
+build_server_chunks_server_ts_qMAZ_E69_js ..> build_server_chunks_provider_B_1Qpqf9_js
+build_server_chunks_server_ts_qMAZ_E69_js ..> _External_ai_sdk_openai_compatible
+build_server_chunks_server_ts_qMAZ_E69_js ..> build_server_chunks_quick_config_HhaVP9p_js
+build_server_chunks_server_ts_qMAZ_E69_js ..> _External_zod
+build_server_chunks_server_ts_qMAZ_E69_js ..> _External_better_sqlite3
+build_server_chunks_server_ts_qMAZ_E69_js ..> _External_drizzle_orm
+build_server_chunks_server_ts_qMAZ_E69_js ..> _External_env_paths
+build_server_chunks_chunk_CTpKBVTY_js ..> _External_ai : streamObject, generateObject
+build_server_chunks_chunk_CTpKBVTY_js ..> build_server_chunks_provider_B_1Qpqf9_js : L
+build_server_chunks_chunk_CTpKBVTY_js ..> _External_zod
+build_server_chunks_error_svelte_B_1t_vyA_js ..> build_server_chunks_renderer_BPdJ79w3_js
+build_server_chunks_error_svelte_B_1t_vyA_js ..> build_server_chunks_state_svelte_CXcvfGLU_js
+build_server_chunks_error_svelte_B_1t_vyA_js ..> build_server_chunks_root_P0jlv39K_js
+build_server_chunks_error_svelte_B_1t_vyA_js ..> build_server_chunks_index_B5clDjd_js
+build_server_chunks_hooks_server_XieQG4HB_js ..> build_server_chunks_index_NcxaM188_js
+build_server_chunks_hooks_server_XieQG4HB_js ..> build_server_chunks_index2_B_QGK2lq_js
+build_server_chunks_hooks_server_XieQG4HB_js ..> build_server_chunks_quick_config_HhaVP9p_js
+build_server_chunks_hooks_server_XieQG4HB_js ..> _External_better_sqlite3
+build_server_chunks_hooks_server_XieQG4HB_js ..> _External_drizzle_orm
+build_server_chunks_hooks_server_XieQG4HB_js ..> _External_env_paths
+build_server_chunks_hooks_server_XieQG4HB_js ..> _External_node_fs
+build_server_chunks_hooks_server_XieQG4HB_js ..> _External_node_path
+build_server_chunks_hooks_server_XieQG4HB_js ..> _External_zod
+build_server_chunks_index_B5clDjd_js ..> build_server_chunks_renderer_BPdJ79w3_js
+build_server_chunks_index_B5clDjd_js ..> build_server_chunks_root_P0jlv39K_js
+build_server_chunks_index2_B_QGK2lq_js ..> _External_better_sqlite3 : Database
+build_server_chunks_index2_B_QGK2lq_js ..> _External_drizzle_orm : drizzle
+build_server_chunks_index2_B_QGK2lq_js ..> _External_env_paths : envPaths
+build_server_chunks_index2_B_QGK2lq_js ..> _External_node_fs : existsSync, mkdirSync, chmodSync
+build_server_chunks_index2_B_QGK2lq_js ..> _External_node_path : join
+build_server_chunks_index2_B_QGK2lq_js ..> _External_drizzle_orm : sqliteTable, integer, text, index, primaryKey, uniqueIndex, real
+build_server_chunks_index3_CcwdkUJm_js ..> _External_drizzle_orm : eq
+build_server_chunks_index3_CcwdkUJm_js ..> _External_parse_diff : parseDiff
+build_server_chunks_index3_CcwdkUJm_js ..> _External_node_crypto : randomUUID
+build_server_chunks_index3_CcwdkUJm_js ..> build_server_chunks_index2_B_QGK2lq_js
+build_server_chunks_index3_CcwdkUJm_js ..> _External_node_fs : rm, mkdir, writeFile, stat
+build_server_chunks_index3_CcwdkUJm_js ..> _External_node_path : join, dirname, isAbsolute, normalize, sep
+build_server_chunks_index3_CcwdkUJm_js ..> _External_node_stream : pipeline
+build_server_chunks_index3_CcwdkUJm_js ..> _External_node_fs : createWriteStream
+build_server_chunks_index3_CcwdkUJm_js ..> _External_tar
+build_server_chunks_index3_CcwdkUJm_js ..> _External_octokit_rest : Octokit
+build_server_chunks_index3_CcwdkUJm_js ..> build_server_chunks_keychain_U_hXKHtG_js
+build_server_chunks_index4_DmwLspgx_js ..> _External_drizzle_orm : eq, and
+build_server_chunks_index4_DmwLspgx_js ..> _External_node_crypto : randomUUID, createHash
+build_server_chunks_index4_DmwLspgx_js ..> build_server_chunks_index2_B_QGK2lq_js
+build_server_chunks_index4_DmwLspgx_js ..> build_server_chunks_index3_CcwdkUJm_js
+build_server_chunks_index4_DmwLspgx_js ..> _External_parse_diff : parseDiff
+build_server_chunks_index4_DmwLspgx_js ..> build_server_chunks_chunk_CTpKBVTY_js : Q, C
+build_server_chunks_index4_DmwLspgx_js ..> build_server_chunks_provider_B_1Qpqf9_js
+build_server_chunks_keychain_U_hXKHtG_js ..> _External_keytar : keytar
+build_server_chunks_provider_B_1Qpqf9_js ..> _External_ai_sdk_openai_compatible : createOpenAICompatible
+build_server_chunks_provider_B_1Qpqf9_js ..> build_server_chunks_quick_config_HhaVP9p_js
+build_server_chunks_provider_B_1Qpqf9_js ..> build_server_chunks_keychain_U_hXKHtG_js
+build_server_chunks_quick_config_HhaVP9p_js ..> _External_zod
+build_server_chunks_quick_config_HhaVP9p_js ..> _External_drizzle_orm : eq
+build_server_chunks_quick_config_HhaVP9p_js ..> build_server_chunks_index2_B_QGK2lq_js
+build_server_chunks_root_P0jlv39K_js ..> build_server_chunks_renderer_BPdJ79w3_js : L, C, R, E, H, S, U, A, M, B, F, G, I, J, K, N, O, P, Q, T, V, W, X, Y, Z, _, $, aa, ab, ac, ad, ae
+build_server_chunks_state_svelte_CXcvfGLU_js ..> build_server_chunks_renderer_BPdJ79w3_js
+build_server_chunks_state_svelte_CXcvfGLU_js ..> build_server_chunks_root_P0jlv39K_js
+build_client_app_immutable_entry_app_nf5nRVH_js ..> build_client_app_immutable_chunks_Dk_K7jte_js : B, ak, ah, ag, an, R, M, a_, a$, aj, af
+build_client_app_immutable_entry_app_nf5nRVH_js ..> build_client_app_immutable_chunks_DA6owlQA_js
+build_client_app_immutable_entry_app_nf5nRVH_js ..> build_client_app_immutable_chunks_EMLs_lsF_js
+build_client_app_immutable_entry_app_nf5nRVH_js ..> build_client_app_immutable_chunks_P6Bjyh8b_js
+build_client_app_immutable_entry_app_nf5nRVH_js ..> build_client_app_immutable_chunks_Ba635FEc_js
+build_client_app_immutable_entry_app_nf5nRVH_js ..> build_client_app_immutable_chunks_sdN_ilVm_js : B
+build_client_app_immutable_entry_app_nf5nRVH_js ..> build_client_app_immutable_chunks_LmBaHa33_js
+build_client_app_immutable_entry_start_CVnRavFK_js ..> build_client_app_immutable_chunks_CXdVdP20_js
+build_client_app_immutable_nodes_0_BUZ_xR0s_js ..> build_client_app_immutable_chunks_EMLs_lsF_js
+build_client_app_immutable_nodes_0_BUZ_xR0s_js ..> build_client_app_immutable_chunks_Dk_K7jte_js : al
+build_client_app_immutable_nodes_0_BUZ_xR0s_js ..> build_client_app_immutable_chunks_sdN_ilVm_js : B
+build_client_app_immutable_nodes_0_BUZ_xR0s_js ..> build_client_app_immutable_chunks_C7o1oaB1_js
+build_client_app_immutable_nodes_1_CKpvXkMi_js ..> build_client_app_immutable_chunks_EMLs_lsF_js
+build_client_app_immutable_nodes_1_CKpvXkMi_js ..> build_client_app_immutable_chunks_Dk_K7jte_js
+build_client_app_immutable_nodes_1_CKpvXkMi_js ..> build_client_app_immutable_chunks_DA6owlQA_js
+build_client_app_immutable_nodes_1_CKpvXkMi_js ..> build_client_app_immutable_chunks_CXdVdP20_js
+build_client_app_immutable_nodes_2_DYC2DMBQ_js ..> build_client_app_immutable_chunks_EMLs_lsF_js
+build_client_app_immutable_nodes_2_DYC2DMBQ_js ..> build_client_app_immutable_chunks_P6Bjyh8b_js
+build_client_app_immutable_nodes_2_DYC2DMBQ_js ..> build_client_app_immutable_chunks_Dk_K7jte_js
+build_client_app_immutable_nodes_2_DYC2DMBQ_js ..> build_client_app_immutable_chunks_Ba635FEc_js
+build_client_app_immutable_nodes_3_CRaywPhw_js ..> build_client_app_immutable_chunks_EMLs_lsF_js
+build_client_app_immutable_nodes_3_CRaywPhw_js ..> build_client_app_immutable_chunks_P6Bjyh8b_js
+build_client_app_immutable_nodes_3_CRaywPhw_js ..> build_client_app_immutable_chunks_Dk_K7jte_js : G
+build_client_app_immutable_nodes_3_CRaywPhw_js ..> build_client_app_immutable_chunks_DA6owlQA_js
+build_client_app_immutable_nodes_3_CRaywPhw_js ..> build_client_app_immutable_chunks_LmBaHa33_js
+build_client_app_immutable_nodes_3_CRaywPhw_js ..> build_client_app_immutable_chunks_Ba635FEc_js
+build_client_app_immutable_nodes_3_CRaywPhw_js ..> build_client_app_immutable_chunks_DsZcThGZ_js
+build_client_app_immutable_nodes_3_CRaywPhw_js ..> build_client_app_immutable_chunks_CcZ9Zpjz_js
+build_client_app_immutable_nodes_3_CRaywPhw_js ..> build_client_app_immutable_chunks_CXdVdP20_js
+build_client_app_immutable_nodes_3_CRaywPhw_js ..> build_client_app_immutable_chunks_CKTwPl8Q_js
+build_client_app_immutable_nodes_4_IXHqjgBu_js ..> build_client_app_immutable_chunks_EMLs_lsF_js
+build_client_app_immutable_nodes_4_IXHqjgBu_js ..> build_client_app_immutable_chunks_P6Bjyh8b_js
+build_client_app_immutable_nodes_4_IXHqjgBu_js ..> build_client_app_immutable_chunks_Dk_K7jte_js : aj, au, av, al
+build_client_app_immutable_nodes_4_IXHqjgBu_js ..> build_client_app_immutable_chunks_DA6owlQA_js
+build_client_app_immutable_nodes_4_IXHqjgBu_js ..> build_client_app_immutable_chunks_Ba635FEc_js
+build_client_app_immutable_nodes_4_IXHqjgBu_js ..> build_client_app_immutable_chunks_DsZcThGZ_js
+build_client_app_immutable_nodes_4_IXHqjgBu_js ..> build_client_app_immutable_chunks_C7o1oaB1_js
+build_client_app_immutable_nodes_4_IXHqjgBu_js ..> build_client_app_immutable_chunks_CcZ9Zpjz_js
+build_client_app_immutable_nodes_4_IXHqjgBu_js ..> build_client_app_immutable_chunks_DzJBCMtF_js
+build_client_app_immutable_nodes_4_IXHqjgBu_js ..> build_client_app_immutable_chunks_CXdVdP20_js
+build_client_app_immutable_nodes_5_40C411Aw_js ..> build_client_app_immutable_chunks_EMLs_lsF_js
+build_client_app_immutable_nodes_5_40C411Aw_js ..> build_client_app_immutable_chunks_P6Bjyh8b_js
+build_client_app_immutable_nodes_5_40C411Aw_js ..> build_client_app_immutable_chunks_Dk_K7jte_js
+build_client_app_immutable_nodes_5_40C411Aw_js ..> build_client_app_immutable_chunks_DA6owlQA_js
+build_client_app_immutable_nodes_5_40C411Aw_js ..> build_client_app_immutable_chunks_LmBaHa33_js
+build_client_app_immutable_nodes_5_40C411Aw_js ..> build_client_app_immutable_chunks_Ba635FEc_js
+build_client_app_immutable_nodes_5_40C411Aw_js ..> build_client_app_immutable_chunks_DsZcThGZ_js
+build_client_app_immutable_nodes_5_40C411Aw_js ..> build_client_app_immutable_chunks_DzJBCMtF_js
+build_client_app_immutable_nodes_5_40C411Aw_js ..> build_client_app_immutable_chunks_CKTwPl8Q_js
+build_client_app_immutable_nodes_6_C1O6KlgL_js ..> build_client_app_immutable_chunks_EMLs_lsF_js
+build_client_app_immutable_nodes_6_C1O6KlgL_js ..> build_client_app_immutable_chunks_P6Bjyh8b_js
+build_client_app_immutable_nodes_6_C1O6KlgL_js ..> build_client_app_immutable_chunks_Dk_K7jte_js
+build_client_app_immutable_nodes_6_C1O6KlgL_js ..> build_client_app_immutable_chunks_DA6owlQA_js
+build_client_app_immutable_nodes_6_C1O6KlgL_js ..> build_client_app_immutable_chunks_Ba635FEc_js
+build_client_app_immutable_chunks_Ba635FEc_js ..> build_client_app_immutable_chunks_Dk_K7jte_js : B
+build_client_app_immutable_chunks_Ba635FEc_js ..> build_client_app_immutable_chunks_sdN_ilVm_js : B
+build_client_app_immutable_chunks_C7o1oaB1_js ..> build_client_app_immutable_chunks_Dk_K7jte_js : H, E, C
+build_client_app_immutable_chunks_CKTwPl8Q_js ..> build_client_app_immutable_chunks_CXdVdP20_js
+build_client_app_immutable_chunks_CXdVdP20_js ..> build_client_app_immutable_chunks_Dk_K7jte_js : af
+build_client_app_immutable_chunks_CXdVdP20_js ..> build_client_app_immutable_chunks_DDL_A9Gd_js
+build_client_app_immutable_chunks_CXdVdP20_js ..> build_client_app_immutable_chunks_P6Bjyh8b_js
+build_client_app_immutable_chunks_CcZ9Zpjz_js ..> build_client_app_immutable_chunks_Dk_K7jte_js : V, aa, ab, ac, ad, ae, G, af, ag, ah
+build_client_app_immutable_chunks_DA6owlQA_js ..> build_client_app_immutable_chunks_Dk_K7jte_js : aw, ah, ag, ax, V, P, an, ay, A, az, J, T, G, Z, ak, F, _, B, E, C, Y, $, D
+build_client_app_immutable_chunks_DA6owlQA_js ..> build_client_app_immutable_chunks_EMLs_lsF_js
+build_client_app_immutable_chunks_DDL_A9Gd_js ..> build_client_app_immutable_chunks_Dk_K7jte_js : ag, ai
+build_client_app_immutable_chunks_DsZcThGZ_js ..> build_client_app_immutable_chunks_Dk_K7jte_js : A, B, C, D, F, G, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X, Y, Z, _, $
+build_client_app_immutable_chunks_DzJBCMtF_js ..> build_client_app_immutable_chunks_Dk_K7jte_js
+build_client_app_immutable_chunks_EMLs_lsF_js ..> build_client_app_immutable_chunks_Dk_K7jte_js : am, an, ao, ap, aq, ar, as, at
+build_client_app_immutable_chunks_LmBaHa33_js ..> build_client_app_immutable_chunks_DDL_A9Gd_js
+build_client_app_immutable_chunks_LmBaHa33_js ..> build_client_app_immutable_chunks_Dk_K7jte_js
+build_client_app_immutable_chunks_P6Bjyh8b_js ..> build_client_app_immutable_chunks_Dk_K7jte_js : aj, ak, ag
+build_client_app_immutable_chunks_sdN_ilVm_js ..> build_client_app_immutable_chunks_Dk_K7jte_js : S, _, T, J, G, Z, L
+stopNetworkMonitor ..> _External_app : browser
+toggleTheme ..> _External_app : browser
+setGlobalVolume ..> _External_howler : Howl
+setGlobalVolume ..> SoundConfig : DEFAULT_CONFIG, SOUND_FILES, SoundConfig, SoundName
+@enduml

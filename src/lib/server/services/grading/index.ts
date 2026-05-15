@@ -54,10 +54,7 @@ const gradingCache = new Map<string, CacheEntry>();
 const CACHE_TTL_MS = 5 * 60 * 1000;
 
 function cacheKey(questionId: string, answer: string): string {
-	const hash = createHash('sha256')
-		.update(questionId)
-		.update(answer)
-		.digest('hex');
+	const hash = createHash('sha256').update(questionId).update(answer).digest('hex');
 	return hash;
 }
 
@@ -275,9 +272,7 @@ function gradeCodeFix(question: Question, payload: CodeFixPayload): GradingResul
 		disqualifierResults: [],
 		rawScore,
 		verdict,
-		feedback: diff
-			? `Differences found:\n${diff}`
-			: 'Code matches expected fix.',
+		feedback: diff ? `Differences found:\n${diff}` : 'Code matches expected fix.',
 		confidence: isCorrect ? 1.0 : similarity >= 0.8 ? 0.7 : 0.9
 	};
 }

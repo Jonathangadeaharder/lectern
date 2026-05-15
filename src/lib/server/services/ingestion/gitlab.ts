@@ -64,12 +64,8 @@ export const gitlabClient: PlatformClient = {
 			body: String(data['description'] ?? ''),
 			author: String((data['author'] as Record<string, unknown>)?.['username'] ?? 'unknown'),
 			state,
-			headSha: String(
-				((data['diff_refs'] as Record<string, unknown>) ?? {})['head_sha'] ?? ''
-			),
-			baseSha: String(
-				((data['diff_refs'] as Record<string, unknown>) ?? {})['base_sha'] ?? ''
-			),
+			headSha: String(((data['diff_refs'] as Record<string, unknown>) ?? {})['head_sha'] ?? ''),
+			baseSha: String(((data['diff_refs'] as Record<string, unknown>) ?? {})['base_sha'] ?? ''),
 			headRef: String(data['source_branch'] ?? ''),
 			baseRef: String(data['target_branch'] ?? ''),
 			createdAt: String(data['created_at'] ?? ''),
