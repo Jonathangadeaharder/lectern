@@ -1,32 +1,19 @@
 import { describe, expect, it } from 'vitest';
-import { z } from 'zod';
-
-const FindingSchema = z.object({
-	id: z.string().optional(),
-	category: z.string().optional(),
-	severityHint: z.enum(['blocker', 'major', 'minor']).optional(),
-	file: z.string().optional(),
-	line: z.number().optional(),
-	endLine: z.number().optional(),
-	message: z.string().optional(),
-	suggestion: z.string().optional()
-});
-
-const PrAgentReviewSchema = z.object({
-	task: z.literal('review'),
-	findings: z.array(FindingSchema).default([]),
-	summary: z.string().default(''),
-	raw: z.unknown().optional()
-});
+import {
+	FindingSchema,
+	PrAgentCrashError,
+	PrAgentParseError,
+	PrAgentReviewSchema,
+	PrAgentSetupError,
+	PrAgentTimeoutError
+} from './index';
 
 describe('PrAgentReviewSchema', () => {
 	it('validates a minimal review', () => {
 		const result = PrAgentReviewSchema.safeParse({ task: 'review' });
 		expect(result.success).toBe(true);
-		if (result.success) {
-			expect(result.data.findings).toEqual([]);
-			expect(result.data.summary).toBe('');
-		}
+		expect(result.success && result.data.findings).toEqual([]);
+		expect(result.success && result.data.summary).toBe('');
 	});
 
 	it('validates a review with findings', () => {
@@ -47,10 +34,8 @@ describe('PrAgentReviewSchema', () => {
 		};
 		const result = PrAgentReviewSchema.safeParse(input);
 		expect(result.success).toBe(true);
-		if (result.success) {
-			expect(result.data.findings).toHaveLength(1);
-			expect(result.data.findings[0]?.severityHint).toBe('blocker');
-		}
+		expect(result.success && result.data.findings).toHaveLength(1);
+		expect(result.success && result.data.findings[0]?.severityHint).toBe('blocker');
 	});
 
 	it('rejects wrong task value', () => {
@@ -61,9 +46,7 @@ describe('PrAgentReviewSchema', () => {
 	it('uses default for missing findings', () => {
 		const result = PrAgentReviewSchema.safeParse({ task: 'review', summary: 'ok' });
 		expect(result.success).toBe(true);
-		if (result.success) {
-			expect(result.data.findings).toEqual([]);
-		}
+		expect(result.success && result.data.findings).toEqual([]);
 	});
 
 	it('accepts raw field', () => {
@@ -99,4 +82,48 @@ describe('FindingSchema', () => {
 		const result = FindingSchema.safeParse({ severityHint: 'critical' });
 		expect(result.success).toBe(false);
 	});
+});
+
+describe('PrAgentSetupError', () => {
+	it('has correct name and message', () => {
+		const err = new PrAgentSetupError('Python not found');
+		expect(err.name).toBe('PrAgentSetupError');
+		expect(err.reason).toBe('Python not found');
+		expect(err.message).toContain('Python not found');
+	});
+});
+
+describe('PrAgentTimeoutError', () => {
+	it('has correct name and message', () => {
+		const err = new PrAgentTimeoutError();
+		expect(err.name).toBe('PrAgentTimeoutError');
+		expect(err.message).toBe('PR-Agent run timed out.');
+	});
+});
+
+describe('PrAgentCrashError', () => {
+	it('has correct name, stderrTail, and code', () => {
+		const err = new PrAgentCrashError('traceback...', 1);
+		expect(err.name).toBe('PrAgentCrashError');
+		expect(err.stderrTail).toBe('traceback...');
+		expect(err.code).toBe(1);
+		expect(err.message).toContain('1');
+	});
+});
+
+describe('PrAgentParseError', () => {
+	it('has correct name, rawOutput, and message', () => {
+		const err = new PrAgentParseError('not json');
+		expect(err.name).toBe('PrAgentParseError');
+		expect(err.rawOutput).toBe('not json');
+		expect(err.message).toContain('not valid JSON');
+	});
+});
+
+describe('runReview', () => {
+	it.todo('requires integration test with venv + DB');
+});
+
+describe('isPrAgentAvailable', () => {
+	it.todo('requires integration test with filesystem');
 });
