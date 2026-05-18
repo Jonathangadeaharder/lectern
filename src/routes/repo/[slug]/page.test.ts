@@ -1,19 +1,27 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/svelte';
 import RepoProfile from './+page.svelte';
+import type { PageData } from './$types';
 
-function payload(over: Record<string, unknown> = {}) {
+function payload(over: Partial<PageData['profile']> = {}): { profile: PageData['profile'] } {
 	return {
 		profile: {
 			repoSlug: 'drizzle-team/orm',
-			competence: { totalSessions: 9, totalQuestions: 81, avgScore: 0.62 } as const,
-			skills: [] as Array<unknown>,
-			weakSpots: [] as Array<unknown>,
-			bugPatterns: [] as Array<unknown>,
-			conventions: [] as Array<unknown>,
-			recentActivity: [] as Array<unknown>,
+			competence: {
+				repoSlug: 'drizzle-team/orm',
+				totalSessions: 9,
+				totalQuestions: 81,
+				avgScore: 0.62,
+				lastSessionAt: null,
+				updatedAt: Date.now()
+			},
+			skills: [],
+			weakSpots: [],
+			bugPatterns: [],
+			conventions: [],
+			recentActivity: [],
 			...over
-		}
+		} as PageData['profile']
 	};
 }
 
@@ -32,9 +40,9 @@ describe('Repo Profile', () => {
 		render(RepoProfile, {
 			data: payload({
 				skills: [
-					{ tag: 'react', ewmaScore: 0.8, level: 'mastered', totalAttempts: 20, passRate: 0.9, trend: [] },
-					{ tag: 'rust', ewmaScore: 0.6, level: 'proficient', totalAttempts: 15, passRate: 0.7, trend: [] },
-					{ tag: 'css', ewmaScore: 0.2, level: 'novice', totalAttempts: 5, passRate: 0.3, trend: [] }
+					{ tag: 'react', ewmaScore: 0.8, level: 'mastered', totalAttempts: 20, passRate: 0.9 },
+					{ tag: 'rust', ewmaScore: 0.6, level: 'proficient', totalAttempts: 15, passRate: 0.7 },
+					{ tag: 'css', ewmaScore: 0.2, level: 'novice', totalAttempts: 5, passRate: 0.3 }
 				]
 			})
 		});
@@ -65,7 +73,7 @@ describe('Repo Profile', () => {
 	it('renders conventions section when present', () => {
 		render(RepoProfile, {
 			data: payload({
-				conventions: [{ source: 'auto' as const, filePath: 'src/foo.ts', summary: 'bar' }]
+				conventions: [{ source: 'contributing' as const, filePath: 'src/foo.ts', summary: 'bar' }]
 			})
 		});
 		expect(screen.getByText('bar')).toBeInTheDocument();
@@ -82,7 +90,7 @@ describe('Repo Profile', () => {
 
 	it('shows no-sessions placeholder when competence null', () => {
 		render(RepoProfile, {
-			data: payload({ competence: null })
+			data: payload({ competence: undefined })
 		});
 		expect(screen.getByText(/No sessions for this repo yet/i)).toBeInTheDocument();
 	});

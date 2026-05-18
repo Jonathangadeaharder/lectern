@@ -11,6 +11,7 @@ import {
 	sessionQuestions,
 	sessions
 } from '../../db/schema';
+import { runText } from '../llm';
 
 export type ConventionSource = 'claude_md' | 'cursorrules' | 'agents_md' | 'windsurfrules' | 'contributing' | 'readme' | 'other';
 
@@ -19,6 +20,7 @@ const CONVENTION_FILES: Array<{ path: string; source: ConventionSource }> = [
 	{ path: '.cursorrules', source: 'cursorrules' },
 	{ path: 'AGENTS.md', source: 'agents_md' },
 	{ path: '.windsurfrules', source: 'windsurfrules' },
+	{ path: 'CONTRIBUTING.md', source: 'contributing' },
 	{ path: 'README.md', source: 'readme' }
 ];
 
@@ -190,6 +192,36 @@ export function getWeakSpots(repoSlug: string): WeakSpotRow[] {
 		.from(repoWeakSpots)
 		.where(eq(repoWeakSpots.repoSlug, repoSlug))
 		.all() as WeakSpotRow[];
+}
+
+export async function summarizeConvention(conventionId: string): Promise<string | null> {
+	const db = getDb();
+	const row = db
+		.select()
+		.from(repoConventions)
+		.where(eq(repoConventions.id, conventionId))
+		.get();
+	if (!row || !row.rawContent) return null;
+	if (row.rawContent.length < 200) return row.rawContent;
+
+	try {
+		const summary = await runText({
+			task: 'summarize_convention',
+			system: 'Summarize the following project convention/contributing guide in 2-4 bullet points. Focus on rules that affect code review: coding standards, testing requirements, commit message format, PR requirements, and architectural constraints.',
+			prompt: row.rawContent.slice(0, 4000),
+			temperature: 0,
+			maxTokens: 400
+		});
+
+		db.update(repoConventions)
+			.set({ summary })
+			.where(eq(repoConventions.id, conventionId))
+			.run();
+
+		return summary;
+	} catch {
+		return null;
+	}
 }
 
 export async function readConventionFiles(repoPath: string, repoSlugValue: string): Promise<RepoConventionRow[]> {

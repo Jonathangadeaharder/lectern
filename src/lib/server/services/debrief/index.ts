@@ -2,6 +2,7 @@ import { eq } from 'drizzle-orm';
 import { getDb } from '../../db';
 import {
 	answers,
+	bookmarks,
 	chunkSets,
 	debriefs,
 	sessionChunks,
@@ -47,6 +48,13 @@ export interface DebriefData {
 		chunkTitle: string;
 		selfConfidence: number;
 		computedScore: number;
+	}>;
+	bookmarks?: Array<{
+		id: string;
+		chunkId: string;
+		file: string;
+		line: number;
+		note: string | null;
 	}>;
 	rawSession?: any;
 }
@@ -173,10 +181,15 @@ export function generateDebrief(sessionId: string): DebriefData {
 				return {
 					questionId: a.questionId,
 					chunkTitle: chunkMeta?.title ?? 'Unknown',
-					selfConfidence: 3,
+					selfConfidence: a.selfConfidence ?? 3,
 					computedScore: score
 				};
 			}),
+		bookmarks: db
+			.select()
+			.from(bookmarks)
+			.where(eq(bookmarks.sessionId, sessionId))
+			.all(),
 		rawSession: {
 			session: { id: session.id, state: session.state, bundleId: session.bundleId },
 			answers: aRows.map((a) => ({

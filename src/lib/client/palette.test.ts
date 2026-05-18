@@ -30,8 +30,8 @@ describe('groupPalette', () => {
 	it('groups by `group` preserving order', () => {
 		const g = groupPalette(sample);
 		expect(Object.keys(g)).toEqual(['Navigate', 'Action']);
-		expect(g.Navigate.map((i) => i.id)).toEqual(['a', 'b']);
-		expect(g.Action.map((i) => i.id)).toEqual(['c']);
+		expect(g.Navigate!.map((i) => i.id)).toEqual(['a', 'b']);
+		expect(g.Action!.map((i) => i.id)).toEqual(['c']);
 	});
 });
 

@@ -95,15 +95,19 @@ export async function GET({ params }) {
 		.all();
 
 	return json({
-		questions: rows.map((r) => ({
-			id: r.id,
-			chunkId: r.chunkId,
-			position: r.position,
-			format: r.format,
-			type: r.type,
-			status: r.status,
-			difficulty: r.difficulty,
-			question: JSON.parse(r.promptJson)
-		}))
+		questions: rows.map((r) => {
+			const parsed = JSON.parse(r.promptJson);
+			parsed.id = r.id;
+			return {
+				id: r.id,
+				chunkId: r.chunkId,
+				position: r.position,
+				format: r.format,
+				type: r.type,
+				status: r.status,
+				difficulty: r.difficulty,
+				question: parsed
+			};
+		})
 	});
 }

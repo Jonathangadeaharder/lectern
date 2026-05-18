@@ -70,79 +70,121 @@ export function getDashboardData(days = 90): DashboardData {
 	const db = getDb();
 	const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
 
-	const activities = db
-		.select()
-		.from(sessionActivity)
-		.where(gte(sessionActivity.date, cutoff))
-		.all();
-
-	const heatmap: HeatmapDay[] = activities.map((a) => ({
-		date: a.date,
-		count: a.questionsAttempted,
-		avgScore: a.avgScore
-	}));
-
-	const masteryRows = getMasteryByTag();
-	const skills: SkillGridItem[] = masteryRows.map((m) => ({
-		tag: m.tag,
-		ewmaScore: m.ewmaScore,
-		level: m.level,
-		totalAttempts: m.totalAttempts,
-		passRate: m.totalAttempts > 0 ? m.passCount / m.totalAttempts : 0,
-		trend: buildTrend(m)
-	}));
-
-	const competenceRows = db.select().from(repoCompetence).all();
-	const repoCards: RepoCard[] = competenceRows.map((rc) => {
-		const weakSpots = db
+	let heatmap: HeatmapDay[] = [];
+	try {
+		const activities = db
 			.select()
-			.from(repoWeakSpots)
-			.where(eq(repoWeakSpots.repoSlug, rc.repoSlug))
+			.from(sessionActivity)
+			.where(gte(sessionActivity.date, cutoff))
 			.all();
-		return {
-			repoSlug: rc.repoSlug,
-			totalSessions: rc.totalSessions,
-			avgScore: rc.avgScore,
-			lastSessionAt: rc.lastSessionAt,
-			topWeakTag: weakSpots.length > 0 ? (weakSpots[0]?.tag ?? null) : null
-		};
-	});
+		heatmap = activities.map((a) => ({
+			date: a.date,
+			count: a.questionsAttempted,
+			avgScore: a.avgScore
+		}));
+	} catch {
+		console.warn('[dashboard] sessionActivity query failed');
+	}
 
-	const recentSessionRows = db
-		.select()
-		.from(sessions)
-		.all()
-		.sort((a, b) => (b.startedAt ?? 0) - (a.startedAt ?? 0))
-		.slice(0, 10);
+	let skills: SkillGridItem[] = [];
+	try {
+		const masteryRows = getMasteryByTag();
+		skills = masteryRows.map((m) => ({
+			tag: m.tag,
+			ewmaScore: m.ewmaScore,
+			level: m.level,
+			totalAttempts: m.totalAttempts,
+			passRate: m.totalAttempts > 0 ? m.passCount / m.totalAttempts : 0,
+			trend: buildTrend(m)
+		}));
+	} catch {
+		console.warn('[dashboard] skillMastery query failed');
+	}
 
-	const recentSessions: RecentSession[] = recentSessionRows.map((s) => {
-		const bundle = db.select().from(bundles).where(eq(bundles.id, s.bundleId)).get();
+	let repoCards: RepoCard[] = [];
+	try {
+		const competenceRows = db.select().from(repoCompetence).all();
+		repoCards = competenceRows.map((rc) => {
+			const weakSpots = db
+				.select()
+				.from(repoWeakSpots)
+				.where(eq(repoWeakSpots.repoSlug, rc.repoSlug))
+				.all();
+			return {
+				repoSlug: rc.repoSlug,
+				totalSessions: rc.totalSessions,
+				avgScore: rc.avgScore,
+				lastSessionAt: rc.lastSessionAt,
+				topWeakTag: weakSpots.length > 0 ? weakSpots[0]!.tag : null
+			};
+		});
+	} catch {
+		console.warn('[dashboard] repoCompetence query failed');
+	}
 
-		const aRows = db.select().from(answers).where(eq(answers.sessionId, s.id)).all();
+	let recentSessions: RecentSession[] = [];
+	try {
+		const recentSessionRows = db
+			.select()
+			.from(sessions)
+			.all()
+			.sort((a, b) => (b.startedAt ?? 0) - (a.startedAt ?? 0))
+			.slice(0, 10);
 
-		const debrief = db.select().from(debriefs).where(eq(debriefs.sessionId, s.id)).get();
+		recentSessions = recentSessionRows.map((s) => {
+			const bundle = db
+				.select()
+				.from(bundles)
+				.where(eq(bundles.id, s.bundleId))
+				.get();
 
-		return {
-			sessionId: s.id,
-			repoSlug: bundle?.repoSlug ?? 'unknown',
-			state: s.state,
-			startedAt: s.startedAt,
-			confidenceScore: debrief?.confidenceScore ?? null,
-			questionsAttempted: aRows.length,
-			questionsPassed: aRows.filter((a) => a.verdict === 'pass').length
-		};
-	});
+			const aRows = db
+				.select()
+				.from(answers)
+				.where(eq(answers.sessionId, s.id))
+				.all();
 
-	const calibration = buildCalibration();
+			const debrief = db
+				.select()
+				.from(debriefs)
+				.where(eq(debriefs.sessionId, s.id))
+				.get();
 
-	const allActivities = db.select().from(sessionActivity).all();
-	const totalSessions = db.select().from(sessions).all().length;
-	const totalQuestions = db.select().from(answers).all().length;
-	const allScores = allActivities
-		.filter((a) => a.avgScore !== null)
-		.map((a) => a.avgScore as number);
-	const overallAvgScore =
-		allScores.length > 0 ? allScores.reduce((s, n) => s + n, 0) / allScores.length : null;
+			return {
+				sessionId: s.id,
+				repoSlug: bundle?.repoSlug ?? 'unknown',
+				state: s.state,
+				startedAt: s.startedAt,
+				confidenceScore: debrief?.confidenceScore ?? null,
+				questionsAttempted: aRows.length,
+				questionsPassed: aRows.filter((a) => a.verdict === 'pass').length
+			};
+		});
+	} catch {
+		console.warn('[dashboard] recentSessions query failed');
+	}
+
+	let calibration: CalibrationPoint[] = [];
+	try {
+		calibration = buildCalibration();
+	} catch {
+		console.warn('[dashboard] calibration query failed');
+	}
+
+	let totalSessions = 0;
+	let totalQuestions = 0;
+	let overallAvgScore: number | null = null;
+	try {
+		const allActivities = db.select().from(sessionActivity).all();
+		totalSessions = db.select().from(sessions).all().length;
+		totalQuestions = db.select().from(answers).all().length;
+		const allScores = allActivities.filter((a) => a.avgScore !== null).map((a) => a.avgScore!);
+		overallAvgScore = allScores.length > 0
+			? allScores.reduce((s, n) => s + n, 0) / allScores.length
+			: null;
+	} catch {
+		console.warn('[dashboard] stats query failed');
+	}
 
 	return {
 		heatmap,

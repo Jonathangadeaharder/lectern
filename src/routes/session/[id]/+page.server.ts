@@ -1,5 +1,5 @@
 import { getDb } from '$lib/server/db';
-import { chunkSets, sessions } from '$lib/server/db/schema';
+import { bundles, chunkSets, sessions } from '$lib/server/db/schema';
 import type { Chunk } from '$lib/server/services/chunking';
 import { describeSession } from '$lib/server/services/session';
 import { error } from '@sveltejs/kit';
@@ -19,9 +19,11 @@ export async function load({ params }) {
 	if (!session) throw error(404, 'session not found');
 	const cs = db.select().from(chunkSets).where(eq(chunkSets.bundleId, session.bundleId)).get();
 	const chunks: Chunk[] = cs ? JSON.parse(cs.chunksJson) : [];
+	const bundle = db.select().from(bundles).where(eq(bundles.id, session.bundleId)).get();
 	return {
 		sessionId: id,
 		session: summary.session,
-		chunks
+		chunks,
+		sourceUrl: bundle?.sourceUrl ?? null
 	};
 }

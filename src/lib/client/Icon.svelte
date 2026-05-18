@@ -19,7 +19,9 @@
 		| 'brain'
 		| 'layers'
 		| 'download'
-		| 'x';
+		| 'x'
+		| 'send'
+		| 'eye';
 
 	let {
 		name,
@@ -113,5 +115,11 @@
 		<line x1="12" x2="12" y1="15" y2="3" />
 	{:else if name === 'x'}
 		<path d="M18 6 6 18M6 6l12 12" />
+	{:else if name === 'send'}
+		<path d="m22 2-7 20-4-9-9-4Z" />
+		<path d="M22 2 11 13" />
+	{:else if name === 'eye'}
+		<path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" />
+		<circle cx="12" cy="12" r="3" />
 	{/if}
 </svg>

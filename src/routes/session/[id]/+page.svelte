@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { onMount, onDestroy } from 'svelte';
+	import { onMount, onDestroy, untrack } from 'svelte';
 	import { browser } from '$app/environment';
 	import { goto } from '$app/navigation';
 	import MultipleChoice from '$lib/components/session/MultipleChoice.svelte';
@@ -35,23 +35,62 @@
 		selfConfidence?: number | null;
 	}
 
-	let session = $state({ ...data.session });
-	let chunks = $state([...data.chunks]);
+	let session = $state(untrack(() => data.session));
+	let chunks = $state(untrack(() => data.chunks));
 	let currentChunkIdx = $state(0);
 	let questions = $state<QuestionRow[]>([]);
 	let answers = $state<Answer[]>([]);
 	let loadingQuestions = $state(true);
-	let generation = $state<{ complete: boolean; chunksReady: number; chunksTotal: number }>({
+	let generation = $state<{
+		complete: boolean;
+		chunksReady: number;
+		chunksTotal: number;
+		currentChunkId: string | null;
+		currentChunkIndex: number | null;
+		elapsedMs: number | null;
+		lastProgressAt: number | null;
+	}>({
 		complete: false,
 		chunksReady: 0,
-		chunksTotal: 0
+		chunksTotal: 0,
+		currentChunkId: null,
+		currentChunkIndex: null,
+		elapsedMs: null,
+		lastProgressAt: null
 	});
+	let failedChunkIds = $state<string[]>([]);
 	let generationPoll: ReturnType<typeof setInterval> | null = null;
-	let sourceUrl = $state<string | null>(null);
+	let elapsedTicker: ReturnType<typeof setInterval> | null = null;
+	let sourceUrl = $state(untrack(() => data.sourceUrl ?? null));
 	let rerunning = $state(false);
 
+	const STUCK_THRESHOLD_MS = 60_000;
+	const genStuck = $derived(
+		!generation.complete &&
+		generation.lastProgressAt !== null &&
+		generation.lastProgressAt > 0 &&
+		(Date.now() - generation.lastProgressAt) > STUCK_THRESHOLD_MS
+	);
+
+	function fmtElapsed(ms: number | null): string {
+		if (ms === null || ms < 0) return '';
+		const s = Math.floor(ms / 1000);
+		if (s < 60) return `${s}s`;
+		const m = Math.floor(s / 60);
+		const rs = s % 60;
+		return `${m}m ${rs}s`;
+	}
+
+	const currentChunkTitle = $derived(
+		generation.currentChunkId && generation.currentChunkId !== '__cross_chunk__'
+			? chunks.find((c) => c.id === generation.currentChunkId)?.title ?? `Chunk ${((generation.currentChunkIndex ?? 0) + 1)}`
+			: generation.currentChunkId === '__cross_chunk__'
+				? 'Cross-chunk question'
+				: null
+	);
+
 	async function rerun(): Promise<void> {
-		if (!sourceUrl || rerunning) return;
+		if (rerunning || !sourceUrl) return;
 		rerunning = true;
 		try {
 			const res = await fetch('/api/sessions/create', {
@@ -177,6 +216,7 @@
 	onDestroy(() => {
 		if (heartbeat) clearInterval(heartbeat);
 		if (generationPoll) clearInterval(generationPoll);
+		if (elapsedTicker) clearInterval(elapsedTicker);
 		if (!browser) return;
 		document.removeEventListener('visibilitychange', onVisibility);
 		window.removeEventListener('beforeunload', onUnload);
@@ -194,13 +234,21 @@
 			session = body.session;
 			chunks = body.chunks ?? chunks;
 			generation = body.generation ?? generation;
+			failedChunkIds = body.failedChunks ?? [];
 			sourceUrl = body.source?.url ?? sourceUrl;
 			if (browser) {
 				if (!generation.complete && !generationPoll) {
-					generationPoll = setInterval(refresh, 1500);
+					generationPoll = setInterval(refresh, 2000);
+					elapsedTicker = setInterval(() => {
+						if (generation.elapsedMs !== null) {
+							generation.elapsedMs = Date.now() - (generation.lastProgressAt ?? Date.now()) + (generation.elapsedMs ?? 0);
+						}
+					}, 1000);
 				} else if (generation.complete && generationPoll) {
 					clearInterval(generationPoll);
+					if (elapsedTicker) clearInterval(elapsedTicker);
 					generationPoll = null;
+					elapsedTicker = null;
 				}
 			}
 		} finally {
@@ -572,17 +620,49 @@
 		</button>
 	</header>
 
-	{#if !generation.complete && generation.chunksTotal > 0}
-		<div class="gen-banner" role="status" aria-live="polite">
+	{#if !generation.complete}
+		<div class="gen-banner" class:gen-banner-stuck={genStuck} role="status" aria-live="polite">
 			<div class="gen-banner-text">
 				<span class="gen-spinner" aria-hidden="true"></span>
-				Generating questions… {generation.chunksReady} of {generation.chunksTotal} chunks ready
+				{#if generation.chunksTotal > 0}
+					Generating questions… {generation.chunksReady} of {generation.chunksTotal} chunks
+					{#if currentChunkTitle}
+						<span class="gen-banner-detail">· on "{currentChunkTitle}"</span>
+					{/if}
+					{#if generation.elapsedMs !== null}
+						<span class="gen-banner-elapsed">· {fmtElapsed(generation.elapsedMs)}</span>
+					{/if}
+					{#if failedChunkIds.length > 0}
+						<span class="gen-banner-warn">({failedChunkIds.length} failed)</span>
+					{/if}
+				{:else}
+					Generating questions…
+				{/if}
 			</div>
-			<div class="gen-progress" aria-hidden="true">
-				<div
-					class="gen-progress-fill"
-					style="width: {(generation.chunksReady / Math.max(1, generation.chunksTotal)) * 100}%"
-				></div>
+			{#if generation.chunksTotal > 0}
+				<div class="gen-progress" aria-hidden="true">
+					<div
+						class="gen-progress-fill"
+						style="width: {(generation.chunksReady / generation.chunksTotal) * 100}%"
+					></div>
+				</div>
+			{/if}
+			{#if genStuck}
+				<div class="gen-banner-stuck-msg">
+					Generation seems stuck (no progress for {Math.floor(STUCK_THRESHOLD_MS / 1000)}s).
+					<button type="button" onclick={rerun} disabled={rerunning} class="gen-banner-retry">Re-run?</button>
+				</div>
+			{/if}
+		</div>
+	{:else if failedChunkIds.length > 0 && generation.chunksTotal > 0}
+		<div class="gen-banner gen-banner-done-with-errors" role="status" aria-live="polite">
+			<div class="gen-banner-text">
+				<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+					<path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+					<line x1="12" y1="9" x2="12" y2="13"/>
+					<line x1="12" y1="17" x2="12.01" y2="17"/>
+				</svg>
+				Generation complete — {failedChunkIds.length} chunk{failedChunkIds.length > 1 ? 's' : ''} failed
 			</div>
 		</div>
 	{/if}
@@ -634,9 +714,61 @@
 			aria-label="Companion"
 		>
 			{#if loadingQuestions}
-				<p class="text-text-muted">Loading…</p>
+				<div class="gen-companion" role="status" aria-live="polite">
+					<div class="gen-companion-spinner" aria-hidden="true"></div>
+					<h3 class="gen-companion-title">Loading session…</h3>
+					<p class="gen-companion-sub">Fetching questions and answers.</p>
+				</div>
 			{:else if !currentChunk}
 				<p class="text-text-muted">No chunk selected.</p>
+			{:else if currentQuestions.length === 0 && !generation.complete}
+				<div class="gen-companion" role="status" aria-live="polite">
+					<div class="gen-companion-spinner" aria-hidden="true"></div>
+					<h3 class="gen-companion-title">Generating questions…</h3>
+					{#if generation.chunksTotal > 0}
+						<p class="gen-companion-sub">{generation.chunksReady} of {generation.chunksTotal} chunks ready</p>
+						{#if currentChunkTitle}
+							<p class="gen-companion-sub">Now processing: {currentChunkTitle}</p>
+						{/if}
+						<div class="gen-companion-bar" aria-hidden="true">
+							<div
+								class="gen-companion-bar-fill"
+								style="width: {(generation.chunksReady / generation.chunksTotal) * 100}%"
+							></div>
+						</div>
+						{#if generation.elapsedMs !== null}
+							<p class="gen-companion-elapsed">Elapsed: {fmtElapsed(generation.elapsedMs)}</p>
+						{/if}
+					{:else}
+						<p class="gen-companion-sub">Preparing chunks…</p>
+					{/if}
+					{#if genStuck}
+						<p class="gen-companion-stuck">No progress for {Math.floor(STUCK_THRESHOLD_MS / 1000)}s — generation may be stuck.</p>
+						<button
+							type="button"
+							onclick={rerun}
+							disabled={rerunning || !sourceUrl}
+							class="rounded-md border border-border px-3 py-1.5 text-sm hover:bg-surface-2 mt-1"
+						>Re-run</button>
+					{/if}
+				</div>
+			{:else if currentQuestions.length === 0 && currentChunk && failedChunkIds.includes(currentChunk.id)}
+				<div class="gen-companion gen-companion-error" role="alert">
+					<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+						<circle cx="12" cy="12" r="10" />
+						<line x1="12" y1="8" x2="12" y2="12" />
+						<line x1="12" y1="16" x2="12.01" y2="16" />
+					</svg>
+					<h3 class="gen-companion-title">Generation failed</h3>
+					<p class="gen-companion-sub">Questions could not be generated for this chunk. The LLM output did not match the expected schema.</p>
+					{#if currentChunkIdx < chunks.length - 1}
+						<button
+							type="button"
+							onclick={() => (currentChunkIdx += 1)}
+							class="rounded-md border border-border px-3 py-1.5 text-sm hover:bg-surface-2"
+						>Next chunk →</button>
+					{/if}
+				</div>
 			{:else if currentQuestions.length === 0}
 				<p class="text-text-muted">No questions for this chunk.</p>
 				<button
@@ -846,8 +978,8 @@
 		aria-label="Keyboard shortcuts"
 		tabindex="-1"
 	>
-		<!-- svelte-ignore a11y_no_static_element_interactions a11y_click_events_have_key_events -->
-		<div class="w-full max-w-md rounded-lg border border-border bg-surface-1 p-6" onclick={(e) => e.stopPropagation()}>
+		<!-- svelte-ignore a11y_no_static_element_interactions a11y_interactive_supports_focus -->
+		<div class="w-full max-w-md rounded-lg border border-border bg-surface-1 p-6" role="dialog" tabindex="-1" onclick={(e) => e.stopPropagation()} onkeydown={(e) => e.stopPropagation()}>
 			<h2 class="mb-4 text-lg font-medium text-text-primary">Keyboard shortcuts</h2>
 			<table class="w-full text-sm">
 				<tbody>
@@ -1119,6 +1251,43 @@
 		border-radius: 50%;
 		animation: gen-spin 800ms linear infinite;
 	}
+	.gen-banner-warn {
+		color: hsl(30 80% 55%);
+	}
+	.gen-banner-detail {
+		color: hsl(var(--text-muted));
+	}
+	.gen-banner-elapsed {
+		color: hsl(var(--text-muted));
+		font-family: var(--font-mono);
+		font-size: 11px;
+	}
+	.gen-banner-stuck {
+		flex-wrap: wrap;
+	}
+	.gen-banner-stuck-msg {
+		width: 100%;
+		font-size: 11px;
+		color: hsl(0 70% 60%);
+		padding-top: 2px;
+	}
+	.gen-banner-retry {
+		background: none;
+		border: none;
+		color: hsl(var(--accent));
+		cursor: pointer;
+		font-size: 11px;
+		text-decoration: underline;
+		padding: 0;
+		margin-left: 4px;
+	}
+	.gen-banner-done-with-errors {
+		background: hsl(30 20% 12%);
+		border-bottom-color: hsl(30 40% 30%);
+	}
+	.gen-banner-done-with-errors svg {
+		color: hsl(30 80% 55%);
+	}
 	@keyframes gen-spin {
 		to {
 			transform: rotate(360deg);
@@ -1165,6 +1334,66 @@
 	}
 	.rerun-btn svg.spin {
 		animation: gen-spin 800ms linear infinite;
+	}
+
+	.gen-companion {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+		gap: 12px;
+		padding: 32px 16px;
+		text-align: center;
+	}
+	.gen-companion-spinner {
+		width: 28px;
+		height: 28px;
+		border: 2.5px solid hsl(var(--border));
+		border-top-color: hsl(var(--accent));
+		border-radius: 50%;
+		animation: gen-spin 800ms linear infinite;
+	}
+	.gen-companion-title {
+		font-size: 14px;
+		font-weight: 500;
+		color: hsl(var(--text-primary));
+		margin: 0;
+	}
+	.gen-companion-sub {
+		font-size: 12px;
+		color: hsl(var(--text-muted));
+		margin: 0;
+	}
+	.gen-companion-bar {
+		width: 100%;
+		max-width: 200px;
+		height: 3px;
+		background: hsl(var(--surface-2));
+		border-radius: 1.5px;
+		overflow: hidden;
+	}
+	.gen-companion-bar-fill {
+		height: 100%;
+		background: hsl(var(--accent));
+		border-radius: 1.5px;
+		transition: width 400ms ease;
+	}
+	.gen-companion-error {
+		color: hsl(var(--text-primary));
+	}
+	.gen-companion-error svg {
+		color: hsl(0 80% 55%);
+	}
+	.gen-companion-elapsed {
+		font-size: 11px;
+		color: hsl(var(--text-muted));
+		font-family: var(--font-mono);
+		margin: 0;
+	}
+	.gen-companion-stuck {
+		font-size: 11px;
+		color: hsl(0 70% 60%);
+		margin: 4px 0 0;
 	}
 
 	.session-shell {

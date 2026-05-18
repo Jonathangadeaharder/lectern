@@ -35,6 +35,57 @@
 	let debrief = $state<Debrief | null>(null);
 	let loading = $state(true);
 
+	let prDraft = $state<{ markdown: string; warnings: string[]; prUrl: string; prPlatform: string | null; canPost: boolean } | null>(null);
+	let prDraftLoading = $state(false);
+	let prDraftLoaded = $state(false);
+	let prEditBody = $state('');
+	let prPosting = $state(false);
+	let prPosted = $state(false);
+	let prError = $state('');
+
+	async function loadPrDraft() {
+		prDraftLoading = true;
+		prError = '';
+		try {
+			const res = await fetch(`/api/sessions/${data.sessionId}/post-comment/draft`);
+			if (!res.ok) {
+				const t = await res.text();
+				prError = t;
+				return;
+			}
+			prDraft = await res.json();
+			prEditBody = prDraft!.markdown;
+			prDraftLoaded = true;
+		} catch (e) {
+			prError = e instanceof Error ? e.message : String(e);
+		} finally {
+			prDraftLoading = false;
+		}
+	}
+
+	async function postComment() {
+		if (!prEditBody) return;
+		prPosting = true;
+		prError = '';
+		try {
+			const res = await fetch(`/api/sessions/${data.sessionId}/post-comment`, {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ body: prEditBody })
+			});
+			if (!res.ok) {
+				const t = await res.text();
+				prError = t;
+				return;
+			}
+			prPosted = true;
+		} catch (e) {
+			prError = e instanceof Error ? e.message : String(e);
+		} finally {
+			prPosting = false;
+		}
+	}
+
 	onMount(async () => {
 		emit('session_debrief');
 		try {
@@ -320,6 +371,95 @@
 				{/if}
 			</div>
 		</div>
+
+		{#if !prDraftLoaded && !prDraftLoading}
+			<div class="post-pr-section">
+				<div class="section-head">
+					<span class="section-head-num">05</span>
+					<div class="section-head-row">
+						<span class="eyebrow">Publish</span>
+						<h2 class="display section-title">Post to PR.</h2>
+					</div>
+				</div>
+				<p class="small muted">Generate a review summary comment and post it to the pull request.</p>
+				<button class="btn" onclick={loadPrDraft}>
+					<Icon name="eye" size={14} /> Prepare draft
+				</button>
+			</div>
+		{:else if prDraftLoading}
+			<div class="post-pr-section">
+				<div class="section-head">
+					<span class="section-head-num">05</span>
+					<div class="section-head-row">
+						<span class="eyebrow">Publish</span>
+						<h2 class="display section-title">Post to PR.</h2>
+					</div>
+				</div>
+				<p class="small muted">Generating draft…</p>
+			</div>
+		{:else if prDraftLoaded && prDraft}
+			<div class="post-pr-section">
+				<div class="section-head">
+					<span class="section-head-num">05</span>
+					<div class="section-head-row">
+						<span class="eyebrow">Publish</span>
+						<h2 class="display section-title">Post to PR.</h2>
+					</div>
+				</div>
+
+				{#if prDraft.warnings.length > 0}
+					<div class="pr-warnings">
+						{#each prDraft.warnings as w (w)}
+							<p class="small" style:color="hsl(var(--state-warning))">{w}</p>
+						{/each}
+					</div>
+				{/if}
+
+				{#if !prDraft.canPost}
+					<div class="pr-notice">
+						<p class="small" style:color="hsl(var(--state-warning))">This session has no valid PR URL — you can copy the draft below.</p>
+					</div>
+				{/if}
+
+				<div class="pr-draft-area">
+					<div class="pr-draft-header">
+						<span class="eyebrow">Draft comment</span>
+						{#if prDraft.prPlatform}
+							<span class="badge badge-accent">{prDraft.prPlatform}</span>
+						{/if}
+					</div>
+					<textarea
+						class="pr-textarea"
+						bind:value={prEditBody}
+						rows={Math.max(8, prEditBody.split('\n').length)}
+						disabled={prPosting || prPosted}
+					></textarea>
+				</div>
+
+				{#if prError}
+					<p class="small" style:color="hsl(var(--state-error))">{prError}</p>
+				{/if}
+
+				{#if prPosted}
+					<p class="small" style:color="hsl(var(--state-success))">Comment posted successfully.</p>
+				{:else if prDraft.canPost}
+					<div class="pr-actions">
+						<button class="btn btn-primary" onclick={postComment} disabled={prPosting || !prEditBody.trim()}>
+							<Icon name="send" size={14} /> {prPosting ? 'Posting…' : 'Post comment'}
+						</button>
+						<button class="btn btn-ghost" onclick={() => { navigator.clipboard.writeText(prEditBody); }} disabled={prPosting}>
+							Copy to clipboard
+						</button>
+					</div>
+				{:else}
+					<div class="pr-actions">
+						<button class="btn btn-ghost" onclick={() => { navigator.clipboard.writeText(prEditBody); }}>
+							Copy to clipboard
+						</button>
+					</div>
+				{/if}
+			</div>
+		{/if}
 	{/if}
 </div>
 
@@ -505,5 +645,51 @@
 	}
 	.mono {
 		font-family: var(--font-mono);
+	}
+
+	.post-pr-section {
+		margin-top: 56px;
+	}
+	.pr-draft-area {
+		margin-top: 16px;
+	}
+	.pr-draft-header {
+		display: flex;
+		align-items: center;
+		gap: 10px;
+		margin-bottom: 8px;
+	}
+	.pr-textarea {
+		width: 100%;
+		min-height: 200px;
+		padding: 14px 16px;
+		font-family: var(--font-mono);
+		font-size: 12px;
+		line-height: 1.6;
+		background: hsl(var(--surface-1));
+		border: 1px solid hsl(var(--border-subtle));
+		border-radius: 8px;
+		color: hsl(var(--text-primary));
+		resize: vertical;
+		tab-size: 2;
+	}
+	.pr-textarea:focus {
+		outline: 2px solid hsl(var(--accent));
+		outline-offset: -1px;
+	}
+	.pr-textarea:disabled {
+		opacity: 0.6;
+	}
+	.pr-actions {
+		margin-top: 14px;
+		display: flex;
+		gap: 10px;
+		align-items: center;
+	}
+	.pr-warnings {
+		margin-bottom: 12px;
+	}
+	.pr-notice {
+		margin-bottom: 12px;
 	}
 </style>

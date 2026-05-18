@@ -1,23 +1,20 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/svelte';
 import Dashboard from './+page.svelte';
+import type { PageData } from './$types';
 
-function payload(over: Record<string, unknown> = {}) {
-	return {
-		dashboard: {
-			heatmap: [] as Array<{ date: string; count: number; avgScore: number | null }>,
-			skills: [] as Array<unknown>,
-			repoCards: [] as Array<unknown>,
-			recentSessions: [] as Array<unknown>,
-			calibration: [] as Array<unknown>,
-			totalSessions: 0,
-			totalQuestions: 0,
-			overallAvgScore: null,
-			streak: 0,
-			streakWeek: [] as boolean[],
-			...over
-		}
+function payload(over: Partial<PageData['dashboard']> = {}): { dashboard: PageData['dashboard'] } {
+	const defaults = {
+		heatmap: [],
+		skills: [],
+		repoCards: [],
+		recentSessions: [],
+		calibration: [],
+		totalSessions: 0,
+		totalQuestions: 0,
+		overallAvgScore: null as number | null
 	};
+	return { dashboard: { ...defaults, ...over } as PageData['dashboard'] };
 }
 
 describe('Dashboard', () => {

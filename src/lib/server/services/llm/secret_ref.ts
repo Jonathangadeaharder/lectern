@@ -4,6 +4,7 @@ export function resolveSecret(value: string): string {
 	const m = ENV_REF.exec(value.trim());
 	if (!m) return value;
 	const name = m[1];
+	if (!name) return value;
 	const fromEnv = process.env[name];
 	if (!fromEnv) {
 		throw new Error(`Environment variable ${name} referenced by {env:${name}} is not set.`);

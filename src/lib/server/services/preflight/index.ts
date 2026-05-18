@@ -6,6 +6,7 @@ import {
 	PrAgentCrashError,
 	PrAgentParseError,
 	type PrAgentReview,
+	type RunReviewResult,
 	PrAgentSetupError,
 	PrAgentTimeoutError,
 	isPrAgentAvailable,
@@ -24,7 +25,8 @@ const TIERS: Record<'blocker' | 'major' | 'minor', readonly string[]> = {
 		'ssrf',
 		'path_traversal',
 		'deserialization_rce',
-		'xxe'
+		'xxe',
+		'missing_test_coverage'
 	],
 	major: [
 		'probable_bug',
@@ -33,7 +35,8 @@ const TIERS: Record<'blocker' | 'major' | 'minor', readonly string[]> = {
 		'missing_error_handling',
 		'broken_invariant',
 		'resource_leak',
-		'logic_error'
+		'logic_error',
+		'missing_test_coverage'
 	],
 	minor: ['style', 'documentation', 'naming', 'formatting', 'lint', 'dead_code']
 };
@@ -49,12 +52,14 @@ export interface PreflightResult {
 	counts: { blocker: number; major: number; minor: number };
 	findings: PrAgentReview['findings'];
 	summary: string;
+	prAgentRunId?: string;
 	error?: { kind: string; message: string };
 	createdAt: number;
 }
 
-export function classifyFinding(category?: string, severityHint?: Tier): Tier {
-	if (severityHint) return severityHint;
+export function classifyFinding(category?: string, severityHint?: string | null): Tier {
+	if (severityHint && (TIERS as Record<string, readonly string[]>)[severityHint]) return severityHint as Tier;
+	if (severityHint === 'blocker' || severityHint === 'major' || severityHint === 'minor') return severityHint;
 	const cat = category?.toLowerCase() ?? '';
 	if (TIERS.blocker.includes(cat)) return 'blocker';
 	if (TIERS.major.includes(cat)) return 'major';
@@ -109,9 +114,15 @@ export async function runPreflight(
 	const sizeCheck = await checkPrSize(bundle.filePath);
 	if (sizeCheck) return persistAndReturn(sizeCheck);
 
+	const testCheck = await checkTestCoverage(bundle.filePath);
+	if (testCheck) return persistAndReturn(testCheck);
+
 	let review: PrAgentReview;
+	let prAgentRunId: string | undefined;
 	try {
-		review = await runReview({ bundleId, signal: opts.signal });
+		const result = await runReview({ bundleId, signal: opts.signal });
+		review = result.review;
+		prAgentRunId = result.runId;
 	} catch (e) {
 		const kind =
 			e instanceof PrAgentTimeoutError
@@ -148,7 +159,8 @@ export async function runPreflight(
 		decision,
 		counts,
 		findings: review.findings,
-		summary: review.summary
+		summary: review.summary,
+		prAgentRunId
 	});
 }
 
@@ -164,6 +176,7 @@ function persistAndReturn(input: Omit<PreflightResult, 'id' | 'createdAt'>): Pre
 			decision: input.decision,
 			countsJson: JSON.stringify(input.counts),
 			findingsJson: JSON.stringify(input.findings),
+			prAgentRunId: input.prAgentRunId,
 			errorKind: input.error?.kind,
 			errorMessage: input.error?.message,
 			createdAt
@@ -174,6 +187,7 @@ function persistAndReturn(input: Omit<PreflightResult, 'id' | 'createdAt'>): Pre
 				decision: input.decision,
 				countsJson: JSON.stringify(input.counts),
 				findingsJson: JSON.stringify(input.findings),
+				prAgentRunId: input.prAgentRunId,
 				errorKind: input.error?.kind,
 				errorMessage: input.error?.message,
 				createdAt
@@ -215,8 +229,10 @@ async function checkPrSize(
 				findings: largeFiles.map((f, i) => ({
 					id: `size-block-${i}`,
 					category: 'oversized_file',
-					severityHint: 'blocker' as const,
+					severityHint: 'blocker',
 					file: f.path,
+					line: null,
+					endLine: null,
 					message: `File exceeds ${LARGE_FILE_LINE_THRESHOLD} lines — review quality degraded`,
 					suggestion: 'Split into smaller files before review'
 				})),
@@ -234,12 +250,71 @@ async function checkPrSize(
 					{
 						id: 'size-warn-files',
 						category: 'large_pr',
-						severityHint: 'major' as const,
+						severityHint: 'major',
+						file: null,
+						line: null,
+						endLine: null,
 						message: `PR changes ${fileCount} files (threshold: ${LARGE_PR_FILE_THRESHOLD})`,
 						suggestion: 'Consider splitting into smaller PRs for better review coverage'
 					}
 				],
 				summary: `WARN: ${fileCount} files changed (threshold: ${LARGE_PR_FILE_THRESHOLD})`
+			};
+		}
+
+		return null;
+	} catch {
+		return null;
+	}
+}
+
+const TEST_PATH_PATTERNS = [
+	/\.test\./i,
+	/\.spec\./i,
+	/_test\./i,
+	/_spec\./i,
+	/\/tests?\//i,
+	/\/__tests__\//i,
+	/\/spec\//i,
+	/\/e2e\//i
+];
+
+function isTestPath(path: string): boolean {
+	return TEST_PATH_PATTERNS.some((p) => p.test(path));
+}
+
+async function checkTestCoverage(
+	bundleFilePath: string
+): Promise<Omit<PreflightResult, 'id' | 'createdAt'> | null> {
+	try {
+		const manifest = await readBundleManifest(bundleFilePath);
+		if (!manifest) return null;
+
+		const nonBinary = manifest.files.filter((f) => !f.binary);
+		if (nonBinary.length === 0) return null;
+
+		const sourceFiles = nonBinary.filter((f) => !isTestPath(f.path));
+		const testFiles = nonBinary.filter((f) => isTestPath(f.path));
+
+		if (sourceFiles.length >= 3 && testFiles.length === 0) {
+			return {
+				bundleId: '',
+				headSha: '',
+				decision: 'warn',
+				counts: { blocker: 0, major: 1, minor: 0 },
+				findings: [
+					{
+						id: 'missing-test-coverage',
+						category: 'missing_test_coverage',
+						severityHint: 'major',
+						file: null,
+						line: null,
+						endLine: null,
+						message: `PR changes ${sourceFiles.length} source file(s) with no test file changes`,
+						suggestion: 'Add corresponding test changes to ensure the behavior is verified'
+					}
+				],
+				summary: `WARN: No test changes detected for ${sourceFiles.length} source file changes`
 			};
 		}
 

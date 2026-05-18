@@ -15,6 +15,31 @@ export function invalidateProviderCache(): void {
 	cachedConfig = undefined;
 }
 
+const compatFetch: typeof fetch = async (input, init) => {
+	if (init?.body && typeof init.body === 'string') {
+		try {
+			const body = JSON.parse(init.body);
+			if ('max_tokens' in body && !('max_completion_tokens' in body)) {
+				body.max_completion_tokens = body.max_tokens;
+				delete body.max_tokens;
+				init = { ...init, body: JSON.stringify(body) };
+			}
+		} catch {
+			// not JSON — pass through
+		}
+	}
+
+	const res = await fetch(input, init);
+
+	if (process.env.LECTERN_LLM_DEBUG === '1') {
+		const clone = res.clone();
+		const text = await clone.text();
+		console.log('[llm-debug] response:', text.slice(0, 2000));
+	}
+
+	return res;
+};
+
 export async function getModel(task?: TaskName): Promise<LanguageModelV2> {
 	const cfg = (await getQuickConfig()) ?? undefined;
 	if (!cfg) throw new LlmNotConfiguredError();
@@ -44,24 +69,12 @@ export async function getModel(task?: TaskName): Promise<LanguageModelV2> {
 		baseURL: endpoint,
 		apiKey: token,
 		headers,
-		supportsStructuredOutputs: true,
-		fetch: process.env.LECTERN_LLM_DEBUG === '1' ? loggingFetch : undefined
+		fetch: compatFetch
 	});
 
 	return provider.chatModel(model);
 }
 
-const loggingFetch: typeof fetch = async (input, init) => {
-	const res = await fetch(input, init);
-	if (process.env.LECTERN_LLM_DEBUG === '1') {
-		const clone = res.clone();
-		const text = await clone.text();
-		console.log('[llm-debug] response:', text.slice(0, 2000));
-	}
-	return res;
-};
-
-/** Build a provider from explicit values (used by `testConnection` before persisting). */
 export function buildModelFromValues(
 	endpoint: string,
 	model: string,
@@ -73,7 +86,7 @@ export function buildModelFromValues(
 		baseURL: endpoint,
 		apiKey: resolveSecret(token),
 		headers,
-		supportsStructuredOutputs: true
+		fetch: compatFetch
 	});
 	return provider.chatModel(model);
 }
