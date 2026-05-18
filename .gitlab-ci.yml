@@ -8,21 +8,22 @@ pr_agent_job:
   image:
     name: pragent/pr-agent:latest
     entrypoint: [""]
+  variables:
+    CONFIG__GIT_PROVIDER: "gitlab"
+    CONFIG__MODEL: "gpt-5.1-EU"
+    CONFIG__FALLBACK_MODELS: '["gpt-5.1-EU"]'
+    OPENAI__API_TYPE: "azure"
+    OPENAI__API_VERSION: "2025-04-01-preview"
+    PR_REVIEWER__EXTRA_INSTRUCTIONS: "This is a SvelteKit + TypeScript project using Drizzle ORM with SQLite. Prefer idiomatic Svelte 5 runes syntax. The Python subdir uses Ruff. Review for security: never expose API keys or .env contents."
   script:
     - cd /app
     - export MR_URL="$CI_MERGE_REQUEST_PROJECT_URL/merge_requests/$CI_MERGE_REQUEST_IID"
     - echo "MR_URL=$MR_URL"
     - export gitlab__url=$CI_SERVER_PROTOCOL://$CI_SERVER_FQDN
     - export gitlab__PERSONAL_ACCESS_TOKEN=$GITLAB_PERSONAL_ACCESS_TOKEN
-    - export config__git_provider="gitlab"
     - export openai__key=$OPENAI_KEY
-    - export openai__api_type="azure"
-    - export openai__api_version="2025-04-01-preview"
     - export openai__api_base=$OPENAI_API_BASE
     - export openai__deployment_id=$OPENAI_DEPLOYMENT_ID
-    - export config__model="gpt-5.1-EU"
-    - export config__fallback_models='["gpt-5.1-EU"]'
-    - export pr_reviewer__extra_instructions="This is a SvelteKit + TypeScript project using Drizzle ORM with SQLite. Prefer idiomatic Svelte 5 runes syntax. The Python subdir uses Ruff. Review for security: never expose API keys or .env contents."
     - python -m pr_agent.cli --pr_url="$MR_URL" describe
     - python -m pr_agent.cli --pr_url="$MR_URL" review
     - python -m pr_agent.cli --pr_url="$MR_URL" improve
