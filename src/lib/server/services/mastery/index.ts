@@ -1,10 +1,11 @@
 import { randomUUID } from 'node:crypto';
 import { and, eq } from 'drizzle-orm';
 import { getDb } from '../../db';
-import { answers, sessionQuestions, skillMastery } from '../../db/schema';
+import { skillMastery, masteryHistory, sessionQuestions, answers } from '../../db/schema';
 
 const EWMA_ALPHA = 0.3;
-const DECAY_RATE_PER_DAY = 0.02;
+const DECAY_RATE_PER_DAY = 1 - Math.pow(0.95, 1 / 30);
+const MASTERY_FLOOR = 0.3;
 const LEVEL_THRESHOLDS = {
 	novice: 0,
 	developing: 0.4,
@@ -29,7 +30,28 @@ export interface SkillMasteryRow {
 }
 
 export function ewma(prev: number, observation: number, alpha = EWMA_ALPHA): number {
-	return alpha * observation + (1 - alpha) * prev;
+	return Math.max(alpha * observation + (1 - alpha) * prev, MASTERY_FLOOR);
+}
+
+function appendHistory(params: {
+	tag: string;
+	repoSlug: string | null;
+	score: number;
+	sessionId?: string;
+	verdict?: string;
+}): void {
+	const db = getDb();
+	db.insert(masteryHistory)
+		.values({
+			id: randomUUID(),
+			tag: params.tag,
+			repoSlug: params.repoSlug ?? '',
+			sessionId: params.sessionId ?? null,
+			ewmaScore: params.score,
+			verdict: params.verdict ?? null,
+			createdAt: Date.now()
+		})
+		.run();
 }
 
 export function classifyLevel(score: number): MasteryLevel {
@@ -40,13 +62,14 @@ export function classifyLevel(score: number): MasteryLevel {
 }
 
 export function decayScore(score: number, daysSinceLast: number): number {
-	if (daysSinceLast <= 0) return score;
-	return score * (1 - DECAY_RATE_PER_DAY) ** daysSinceLast;
+	if (daysSinceLast <= 0) return Math.max(score, MASTERY_FLOOR);
+	return Math.max(score * Math.pow(1 - DECAY_RATE_PER_DAY, daysSinceLast), MASTERY_FLOOR);
 }
 
 export function updateMastery(params: {
 	tag: string;
 	repoSlug?: string | null;
+	sessionId?: string;
 	passed: boolean;
 }): SkillMasteryRow {
 	const db = getDb();
@@ -84,6 +107,14 @@ export function updateMastery(params: {
 			.where(eq(skillMastery.id, existing.id))
 			.run();
 
+		appendHistory({
+			tag: params.tag,
+			repoSlug,
+			score: newScore,
+			sessionId: params.sessionId,
+			verdict: params.passed ? 'pass' : 'fail'
+		});
+
 		return {
 			...existing,
 			ewmaScore: newScore,
@@ -113,6 +144,15 @@ export function updateMastery(params: {
 	};
 
 	db.insert(skillMastery).values(row).run();
+
+	appendHistory({
+		tag: params.tag,
+		repoSlug,
+		score: newScore,
+		sessionId: params.sessionId,
+		verdict: params.passed ? 'pass' : 'fail'
+	});
+
 	return row;
 }
 
@@ -167,6 +207,50 @@ export function getMasteryForTag(tag: string, repoSlug?: string | null): SkillMa
 	return (row as SkillMasteryRow) ?? null;
 }
 
+export function resetMastery(tagId?: string): number {
+	const db = getDb();
+	if (tagId) {
+		const rows = db.select().from(skillMastery).where(eq(skillMastery.tag, tagId)).all();
+		for (const row of rows) {
+			db.update(skillMastery)
+				.set({
+					ewmaScore: 0.5,
+					level: 'novice',
+					totalAttempts: 0,
+					passCount: 0,
+					lastAttemptAt: null,
+					lastDecayAt: null,
+					updatedAt: Date.now()
+				})
+				.where(eq(skillMastery.id, row.id))
+				.run();
+		}
+		db.delete(masteryHistory).where(eq(masteryHistory.tag, tagId)).run();
+		return rows.length;
+	}
+	const allRows = db.select().from(skillMastery).all();
+	for (const row of allRows) {
+		db.update(skillMastery)
+			.set({
+				ewmaScore: 0.5,
+				level: 'novice',
+				totalAttempts: 0,
+				passCount: 0,
+				lastAttemptAt: null,
+				lastDecayAt: null,
+				updatedAt: Date.now()
+			})
+			.where(eq(skillMastery.id, row.id))
+			.run();
+	}
+	db.delete(masteryHistory).run();
+	return allRows.length;
+}
+
+export function resetAllMastery(): number {
+	return resetMastery();
+}
+
 export function updateMasteryFromSession(
 	sessionId: string,
 	repoSlug?: string | null
@@ -191,7 +275,7 @@ export function updateMasteryFromSession(
 		const passed = ans.verdict === 'pass';
 
 		for (const tag of tags) {
-			const row = updateMastery({ tag, repoSlug, passed });
+			const row = updateMastery({ tag, repoSlug, sessionId, passed });
 			updated.push(row);
 		}
 	}

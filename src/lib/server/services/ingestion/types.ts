@@ -1,3 +1,5 @@
+import { z } from 'zod';
+
 export interface PrMetadata {
 	title: string;
 	body: string;
@@ -40,6 +42,34 @@ export interface BundleManifest {
 	headSha: string;
 	baseSha: string;
 	files: BundleFileEntry[];
+}
+
+export const BundleManifestSchema = z.object({
+	formatVersion: z.literal('1'),
+	source: z.object({
+		url: z.string().url(),
+		platform: z.enum(['github', 'gitlab']),
+		host: z.string().min(1),
+		owner: z.string().min(1),
+		repo: z.string().min(1),
+		prNumber: z.number().int().positive(),
+		fetchedAt: z.number().int().positive()
+	}),
+	headSha: z.string().min(1),
+	baseSha: z.string().min(1),
+	files: z.array(
+		z.object({
+			path: z.string().min(1),
+			baseSize: z.number().int().nonnegative(),
+			headSize: z.number().int().nonnegative(),
+			binary: z.boolean(),
+			renamed: z.object({ from: z.string() }).optional()
+		})
+	)
+});
+
+export function validateBundleManifest(data: unknown): BundleManifest {
+	return BundleManifestSchema.parse(data);
 }
 
 export interface IngestProgressEvent {

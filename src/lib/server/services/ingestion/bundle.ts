@@ -5,6 +5,7 @@ import { pipeline } from 'node:stream/promises';
 import * as tar from 'tar';
 import { resolveDataDir } from '../../config/paths';
 import type { BundleManifest } from './types';
+import { validateBundleManifest } from './types';
 import type { ParsedPrUrl } from './url';
 import { repoSlug } from './url';
 
@@ -80,6 +81,8 @@ export async function writeBundle(
 	);
 
 	await rm(stagingDir, { recursive: true, force: true });
+
+	validateBundleManifest(input.manifest);
 
 	const s = await stat(filePath);
 	return { filePath, sizeBytes: s.size };

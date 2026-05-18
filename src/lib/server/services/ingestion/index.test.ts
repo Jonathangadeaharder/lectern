@@ -98,7 +98,7 @@ describe('ingestFromUrl', () => {
 	it('IngestionAuthError contains platform info', () => {
 		const err = new IngestionAuthError('github');
 		expect(err.platform).toBe('github');
-		expect(err.message).toContain('github');
+		expect(err.message).toContain('Settings');
 		expect(err.name).toBe('IngestionAuthError');
 	});
 });
