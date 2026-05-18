@@ -44,7 +44,7 @@ export function computeScore(rubric: Rubric, result: GradingResult): ComputedSco
 	const raw = clamp(reqScore - dqPenalty, 0, 1);
 
 	const passThreshold = rubric.scoring.passThreshold;
-	const [borderlineMin = 0] = rubric.scoring.borderlineBand ?? [];
+	const borderlineMin = rubric.scoring.borderlineBand[0] ?? 0;
 
 	let verdict: ComputedScore['verdict'];
 	if (raw >= passThreshold) verdict = 'pass';

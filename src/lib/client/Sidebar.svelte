@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
 	import { page } from '$app/stores';
 	import { goto } from '$app/navigation';
 	import { isNavActive } from './shell';
@@ -8,6 +9,12 @@
 	interface RepoRef {
 		slug: string;
 		pulse: number;
+	}
+
+	interface RecentSession {
+		sessionId: string;
+		repoSlug: string;
+		state: string;
 	}
 
 	let {
@@ -27,6 +34,22 @@
 		userSubtitle?: string;
 		onPalette?: () => void;
 	} = $props();
+
+	let recentSessions = $state<RecentSession[]>([]);
+
+	onMount(async () => {
+		try {
+			const res = await fetch('/api/dashboard');
+			if (res.ok) {
+				const body = await res.json();
+				recentSessions = (body.recentSessions ?? [])
+					.filter((s: RecentSession) => s.state !== 'completed' && s.state !== 'abandoned')
+					.slice(0, 5);
+			}
+		} catch {
+			// non-critical
+		}
+	});
 
 	const nav = [
 		{ id: 'dashboard', href: '/dashboard', label: 'Dashboard', icon: 'home' as const },
@@ -72,6 +95,19 @@
 			</button>
 		{/each}
 	</nav>
+
+	{#if recentSessions.length > 0}
+		<div class="section-eyebrow">Active Sessions</div>
+		<div class="nav-list">
+			{#each recentSessions as s (s.sessionId)}
+				<a class="session-row" href={`/session/${s.sessionId}`} title={s.repoSlug}>
+					<span class="session-dot" class:active-dot={s.state === 'active'} class:paused-dot={s.state === 'paused'}></span>
+					<span class="session-slug">{s.repoSlug.split('/').pop() ?? s.repoSlug}</span>
+					<span class="session-state">{s.state}</span>
+				</a>
+			{/each}
+		</div>
+	{/if}
 
 	{#if repos.length > 0}
 		<div class="section-eyebrow">Codebases</div>
@@ -260,6 +296,50 @@
 	.repo-row-add {
 		color: hsl(var(--text-muted));
 		font-size: 12px;
+	}
+
+	.session-row {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		padding: 6px 10px;
+		height: 28px;
+		background: transparent;
+		color: hsl(var(--text-secondary));
+		border-radius: 6px;
+		font-size: 12.5px;
+		text-decoration: none;
+		transition: background var(--duration-base) var(--ease-out);
+	}
+	.session-row:hover {
+		background: hsl(var(--surface-2));
+	}
+	.session-dot {
+		width: 6px;
+		height: 6px;
+		border-radius: 50%;
+		flex-shrink: 0;
+		background: hsl(var(--text-muted));
+	}
+	.active-dot {
+		background: hsl(var(--state-success));
+		box-shadow: 0 0 4px hsl(var(--state-success) / 0.5);
+	}
+	.paused-dot {
+		background: hsl(var(--state-warning));
+	}
+	.session-slug {
+		font-family: var(--font-mono);
+		font-size: 11.5px;
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		flex: 1;
+	}
+	.session-state {
+		font-size: 10px;
+		font-family: var(--font-mono);
+		color: hsl(var(--text-muted));
 	}
 
 	.repo-mark {

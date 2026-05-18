@@ -4,7 +4,7 @@ import { filterPalette, groupPalette, clampIndex } from './palette';
 const sample = [
 	{ id: 'a', label: 'Go to Dashboard', hint: 'G then H', group: 'Navigate' },
 	{ id: 'b', label: 'Open settings', hint: '\u2318,', group: 'Navigate' },
-	{ id: 'c', label: 'Paste a new PR\u2026', hint: '\u2318N', group: 'Action' }
+	{ id: 'c', label: 'Paste a new PR\u2026', hint: '\u2318N', group: 'Action' },
 ];
 
 describe('filterPalette', () => {

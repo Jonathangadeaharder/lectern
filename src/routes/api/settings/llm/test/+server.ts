@@ -3,9 +3,8 @@ import {
 	testConnection
 } from '$lib/server/services/llm/test_connection';
 import { error, json } from '@sveltejs/kit';
-import type { RequestEvent } from '@sveltejs/kit';
 
-export async function POST({ request }: RequestEvent) {
+export async function POST({ request }) {
 	const body = await request.json().catch(() => null);
 	const parsed = TestConnectionRequestSchema.safeParse(body);
 	if (!parsed.success) {

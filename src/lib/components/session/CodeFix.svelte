@@ -13,9 +13,11 @@
 		graded?: { rawScore?: number; verdict?: string; feedback?: string };
 	}
 
+	import { untrack } from 'svelte';
+
 	let { question, onsubmit, onskip, graded }: Props = $props();
 
-	let code = $state(question?.originalCode ?? '');
+	let code = $state(untrack(() => question?.originalCode ?? ''));
 	let submitting = $state(false);
 
 	async function submit(): Promise<void> {

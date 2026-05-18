@@ -13,6 +13,7 @@ import {
 	type Rubric
 } from '../llm/schemas';
 import { computeScore } from './score';
+import { updateMasteryFromSession } from '../mastery';
 
 export interface ClickLinesPayload {
 	marked: Array<{ file: string; line: number }>;
@@ -54,7 +55,10 @@ const gradingCache = new Map<string, CacheEntry>();
 const CACHE_TTL_MS = 5 * 60 * 1000;
 
 function cacheKey(questionId: string, answer: string): string {
-	const hash = createHash('sha256').update(questionId).update(answer).digest('hex');
+	const hash = createHash('sha256')
+		.update(questionId)
+		.update(answer)
+		.digest('hex');
 	return hash;
 }
 
@@ -112,6 +116,7 @@ export async function gradeAnswer(args: GradeArgs): Promise<GradingResult> {
 	}
 
 	persistAnswer(args, final);
+	updateMasteryFromSession(args.sessionId);
 	return final;
 }
 
@@ -178,6 +183,7 @@ export async function* streamGradeFreeText(args: {
 		{ sessionId: args.sessionId, questionId: args.questionId, payload: { answer: args.answer } },
 		result
 	);
+	updateMasteryFromSession(args.sessionId);
 	yield { final: result };
 }
 
@@ -272,7 +278,9 @@ function gradeCodeFix(question: Question, payload: CodeFixPayload): GradingResul
 		disqualifierResults: [],
 		rawScore,
 		verdict,
-		feedback: diff ? `Differences found:\n${diff}` : 'Code matches expected fix.',
+		feedback: diff
+			? `Differences found:\n${diff}`
+			: 'Code matches expected fix.',
 		confidence: isCorrect ? 1.0 : similarity >= 0.8 ? 0.7 : 0.9
 	};
 }

@@ -13,7 +13,7 @@ export const sessionQuestions = sqliteTable(
 		format: text('format', {
 			enum: ['multiple_choice', 'free_text', 'click_lines', 'true_false', 'code_fix']
 		}).notNull(),
-		type: text('type', { enum: ['anchor', 'implication'] }).notNull(),
+		type: text('type', { enum: ['anchor', 'implication', 'cross_chunk'] }).notNull(),
 		promptJson: text('prompt_json').notNull(),
 		rubricJson: text('rubric_json'),
 		skillTagsJson: text('skill_tags_json').notNull().default('[]'),

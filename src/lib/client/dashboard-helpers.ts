@@ -12,7 +12,9 @@ export function scorePercent(score: number | null | undefined): string {
 	return `${Math.round(score * 100)}%`;
 }
 
-export function averageScore(rows: ReadonlyArray<{ avgScore: number | null }>): number | null {
+export function averageScore(
+	rows: ReadonlyArray<{ avgScore: number | null }>
+): number | null {
 	const scored = rows.filter((r) => r.avgScore !== null);
 	if (scored.length === 0) return null;
 	const sum = scored.reduce((s, r) => s + (r.avgScore ?? 0), 0);

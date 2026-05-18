@@ -12,17 +12,8 @@ afterEach(() => {
 if (typeof globalThis.fetch === 'function') {
 	const originalFetch = globalThis.fetch;
 	globalThis.fetch = (input, init) => {
-		const url =
-			typeof input === 'string'
-				? input
-				: input instanceof URL
-					? input.toString()
-					: (input as Request).url;
-		if (
-			url.startsWith('http://localhost') ||
-			url.startsWith('https://localhost') ||
-			url.startsWith('/')
-		) {
+		const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : (input as Request).url;
+		if (url.startsWith('http://localhost') || url.startsWith('https://localhost') || url.startsWith('/')) {
 			// Allow MSW handlers and same-origin
 			return originalFetch(input, init);
 		}

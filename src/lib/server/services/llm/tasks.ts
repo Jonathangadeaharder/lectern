@@ -1,4 +1,4 @@
-/** Frozen v1 task taxonomy. */
+/** Task taxonomy. */
 export type TaskName =
 	| 'generate_questions'
 	| 'grade_freetext'
@@ -7,4 +7,5 @@ export type TaskName =
 	| 'chunk_titles'
 	| 'cumulative_summary'
 	| 'bug_pattern_extraction'
-	| 'ask_about_selection';
+	| 'ask_about_selection'
+	| 'summarize_convention';

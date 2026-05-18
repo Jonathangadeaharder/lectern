@@ -6,7 +6,7 @@ export const prAgentRuns = sqliteTable('pr_agent_runs', {
 	bundleId: text('bundle_id')
 		.notNull()
 		.references(() => bundles.id, { onDelete: 'cascade' }),
-	task: text('task', { enum: ['review', 'describe'] }).notNull(),
+	task: text('task', { enum: ['review', 'describe', 'improve', 'ask'] }).notNull(),
 	status: text('status', { enum: ['running', 'done', 'error'] })
 		.notNull()
 		.default('running'),

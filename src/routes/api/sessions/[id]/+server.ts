@@ -3,14 +3,15 @@ import { bundles, chunkSets, sessionQuestions, sessions } from '$lib/server/db/s
 import {
 	deleteSession,
 	describeSession,
+	getFailedChunks,
+	getGenState,
 	isGenerating,
 	listSessionAnswers
 } from '$lib/server/services/session';
 import { error, json } from '@sveltejs/kit';
-import type { RequestEvent } from '@sveltejs/kit';
 import { eq } from 'drizzle-orm';
 
-export async function GET({ params }: RequestEvent) {
+export async function GET({ params }) {
 	const id = params.id;
 	if (!id) throw error(400, 'missing id');
 	try {
@@ -25,18 +26,23 @@ export async function GET({ params }: RequestEvent) {
 			.from(sessionQuestions)
 			.where(eq(sessionQuestions.sessionId, id))
 			.all();
-		const questions = qRows.map((q) => ({
-			id: q.id,
-			chunkId: q.chunkId,
-			position: q.position,
-			format: q.format,
-			type: q.type,
-			status: q.status,
-			question: JSON.parse(q.promptJson)
-		}));
+		const questions = qRows.map((q) => {
+			const parsed = JSON.parse(q.promptJson);
+			parsed.id = q.id;
+			return {
+				id: q.id,
+				chunkId: q.chunkId,
+				position: q.position,
+				format: q.format,
+				type: q.type,
+				status: q.status,
+				question: parsed
+			};
+		});
 		const chunksReady = new Set(qRows.map((q) => q.chunkId)).size;
 		const stillGenerating = isGenerating(id);
 		const bundle = db.select().from(bundles).where(eq(bundles.id, session.bundleId)).get();
+		const gs = getGenState(id);
 		return json({
 			session: summary.session,
 			chunks,
@@ -46,15 +52,20 @@ export async function GET({ params }: RequestEvent) {
 			generation: {
 				complete: !stillGenerating,
 				chunksReady,
-				chunksTotal: chunks.length
-			}
+				chunksTotal: chunks.length,
+				currentChunkId: gs?.currentChunkId ?? null,
+				currentChunkIndex: gs?.currentChunkIndex ?? null,
+				elapsedMs: gs ? Date.now() - gs.startedAt : null,
+				lastProgressAt: gs?.lastProgressAt ?? null
+			},
+			failedChunks: getFailedChunks(id)
 		});
 	} catch (e) {
 		throw error(500, e instanceof Error ? e.message : String(e));
 	}
 }
 
-export async function DELETE({ params }: RequestEvent) {
+export async function DELETE({ params }) {
 	const id = params.id;
 	if (!id) throw error(400, 'missing id');
 	deleteSession(id);

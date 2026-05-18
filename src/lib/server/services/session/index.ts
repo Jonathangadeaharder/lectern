@@ -3,7 +3,8 @@ import { and, eq } from 'drizzle-orm';
 import { getDb } from '../../db';
 import { answers, bundles, sessionChunks, sessionQuestions, sessions } from '../../db/schema';
 import { chunkBundle } from '../chunking';
-import { generateQuestionsForChunk } from '../questions';
+import { clearCacheForTask, resetCircuitBreaker } from '../llm';
+import { generateCrossChunkQuestion, generateQuestionsForChunk } from '../questions';
 import { type SessionEvent, type SessionState, nextState } from './machine';
 
 export interface SessionRow {
@@ -29,6 +30,27 @@ export async function createSession(
 	const db = getDb();
 	const bundle = db.select().from(bundles).where(eq(bundles.id, bundleId)).get();
 	if (!bundle) throw new Error(`bundle not found: ${bundleId}`);
+
+	if (!opts.force) {
+		const existing = db
+			.select()
+			.from(sessions)
+			.where(eq(sessions.bundleId, bundleId))
+			.all()
+			.filter((s) => s.state !== 'abandoned')
+			.sort((a, b) => (b.lastActivityAt ?? 0) - (a.lastActivityAt ?? 0));
+
+		if (existing.length > 0) {
+			const s = existing[0]!;
+			if (generating.has(s.id)) return loadSession(s.id);
+			const qCount = db
+				.select()
+				.from(sessionQuestions)
+				.where(eq(sessionQuestions.sessionId, s.id))
+				.all().length;
+			if (qCount > 0) return loadSession(s.id);
+		}
+	}
 
 	const chunks = await chunkBundle(bundleId, { force: opts.force });
 	const sessionId = randomUUID();
@@ -60,15 +82,40 @@ export async function createSession(
 	});
 
 	generating.add(sessionId);
+	resetCircuitBreaker('generate_questions');
+	if (opts.force) clearCacheForTask('generate_questions');
 	void generateQuestionsBackground(sessionId, bundleId, chunks);
 
 	return loadSession(sessionId);
 }
 
 const generating = new Set<string>();
+const failedChunks = new Map<string, Set<string>>();
+
+const CHUNK_TIMEOUT_MS = 120_000;
+const TOTAL_TIMEOUT_MS = 600_000;
+
+interface GenState {
+	currentChunkId: string | null;
+	currentChunkIndex: number;
+	totalChunks: number;
+	startedAt: number;
+	lastProgressAt: number;
+}
+
+const genStates = new Map<string, GenState>();
 
 export function isGenerating(sessionId: string): boolean {
 	return generating.has(sessionId);
+}
+
+export function getFailedChunks(sessionId: string): string[] {
+	const set = failedChunks.get(sessionId);
+	return set ? [...set] : [];
+}
+
+export function getGenState(sessionId: string): GenState | null {
+	return genStates.get(sessionId) ?? null;
 }
 
 async function generateQuestionsBackground(
@@ -76,18 +123,74 @@ async function generateQuestionsBackground(
 	bundleId: string,
 	chunks: Awaited<ReturnType<typeof chunkBundle>>
 ): Promise<void> {
+	failedChunks.set(sessionId, new Set());
+	const state: GenState = {
+		currentChunkId: null,
+		currentChunkIndex: 0,
+		totalChunks: chunks.length,
+		startedAt: Date.now(),
+		lastProgressAt: Date.now()
+	};
+	genStates.set(sessionId, state);
+
+	const overallController = new AbortController();
+	const overallTimer = setTimeout(() => {
+		console.warn(`[session] generation overall timeout (${TOTAL_TIMEOUT_MS}ms) for ${sessionId}`);
+		overallController.abort();
+	}, TOTAL_TIMEOUT_MS);
+
 	try {
-		for (const chunk of chunks) {
+		for (let i = 0; i < chunks.length; i++) {
+			if (overallController.signal.aborted) {
+				console.warn(`[session] generation aborted, skipping remaining chunks`);
+				for (let j = i; j < chunks.length; j++) {
+					failedChunks.get(sessionId)?.add(chunks[j]!.id);
+				}
+				break;
+			}
+
+			const chunk = chunks[i]!;
+			state.currentChunkId = chunk.id;
+			state.currentChunkIndex = i;
+			state.lastProgressAt = Date.now();
+
 			try {
-				await generateQuestionsForChunk({ sessionId, bundleId, chunk });
+				const chunkResult = await Promise.race([
+					generateQuestionsForChunk({ sessionId, bundleId, chunk }),
+					new Promise<null>((_, reject) =>
+						setTimeout(() => reject(new Error(`chunk timeout (${CHUNK_TIMEOUT_MS}ms)`)), CHUNK_TIMEOUT_MS)
+					)
+				]);
+				if (chunkResult === null) {
+					throw new Error(`chunk timeout (${CHUNK_TIMEOUT_MS}ms)`);
+				}
+				state.lastProgressAt = Date.now();
 			} catch (e) {
 				console.warn(
 					`[session] question gen failed for chunk ${chunk.id}: ${(e as Error).message}`
 				);
+				failedChunks.get(sessionId)?.add(chunk.id);
+			}
+		}
+
+		if (!overallController.signal.aborted) {
+			state.currentChunkId = '__cross_chunk__';
+			state.currentChunkIndex = chunks.length;
+			state.lastProgressAt = Date.now();
+			try {
+				await generateCrossChunkQuestion({ sessionId, bundleId, chunks });
+			} catch (e) {
+				console.warn(`[session] cross-chunk question gen failed: ${(e as Error).message}`);
 			}
 		}
 	} finally {
+		clearTimeout(overallTimer);
 		generating.delete(sessionId);
+		state.currentChunkId = null;
+		setTimeout(() => {
+			failedChunks.delete(sessionId);
+			genStates.delete(sessionId);
+		}, 60_000);
 	}
 }
 

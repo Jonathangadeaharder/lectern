@@ -3,42 +3,20 @@ import type { Chunk, Hunk } from './types';
 
 const TEST_FILE_RE = /(__tests?__|\.test\.|\.spec\.|tests?\/|_test\.\w+$|test_[\w-]+\.\w+$)/i;
 
-const LANG_RE =
-	/\.(tsx?|jsx?|py|rb|go|rs|java|kt|swift|c|cpp|h|hpp|cs|php|pl|sh|sql|yaml|yml|json|toml|zig|nim|ex|exs|hs|ml|sc|scala|lua|r|dart|vue|svelte)$/i;
+const LANG_RE = /\.(tsx?|jsx?|py|rb|go|rs|java|kt|swift|c|cpp|h|hpp|cs|php|pl|sh|sql|yaml|yml|json|toml|zig|nim|ex|exs|hs|ml|sc|scala|lua|r|dart|vue|svelte)$/i;
 
-const IMPORT_RELATIVE_RE =
-	/(?:import\s+.*?(?:from|)\s+['"]\.\/([^'"]+)['"]|require\s*\(\s*['"]\.\/([^'"]+)['"]\s*\)|from\s+['"]\.\/([^'"]+)['"]\s+import)/g;
+const IMPORT_RELATIVE_RE = /(?:import\s+.*?(?:from|)\s+['"]\.\/([^'"]+)['"]|require\s*\(\s*['"]\.\/([^'"]+)['"]\s*\)|from\s+['"]\.\/([^'"]+)['"]\s+import)/g;
 
 function extractLanguage(path: string): string {
 	const m = LANG_RE.exec(path);
 	if (!m) return 'unknown';
 	const ext = m[1]!.toLowerCase();
 	const map: Record<string, string> = {
-		ts: 'typescript',
-		tsx: 'typescript',
-		js: 'javascript',
-		jsx: 'javascript',
-		py: 'python',
-		rb: 'ruby',
-		go: 'go',
-		rs: 'rust',
-		java: 'java',
-		kt: 'kotlin',
-		swift: 'swift',
-		c: 'c',
-		cpp: 'cpp',
-		h: 'c',
-		hpp: 'cpp',
-		cs: 'csharp',
-		php: 'php',
-		svelte: 'svelte',
-		vue: 'vue',
-		dart: 'dart',
-		scala: 'scala',
-		hs: 'haskell',
-		ex: 'elixir',
-		exs: 'elixir',
-		zig: 'zig'
+		ts: 'typescript', tsx: 'typescript', js: 'javascript', jsx: 'javascript',
+		py: 'python', rb: 'ruby', go: 'go', rs: 'rust', java: 'java', kt: 'kotlin',
+		swift: 'swift', c: 'c', cpp: 'cpp', h: 'c', hpp: 'cpp', cs: 'csharp',
+		php: 'php', svelte: 'svelte', vue: 'vue', dart: 'dart', scala: 'scala',
+		hs: 'haskell', ex: 'elixir', exs: 'elixir', zig: 'zig'
 	};
 	return map[ext] ?? ext;
 }
@@ -167,7 +145,9 @@ export function groupHunksToChunks(hunks: Hunk[]): Chunk[] {
 	for (const g of merged) {
 		const allHunks = g.files.flatMap((f) => byFile.get(f) ?? []);
 		const relImports = extractRelativeImportsFromHunks(allHunks);
-		const resolved = relImports.map((imp) => g.files.map((f) => resolveImportPath(f, imp))).flat();
+		const resolved = relImports
+			.map((imp) => g.files.map((f) => resolveImportPath(f, imp)))
+			.flat();
 		groupImports.set(g.files, resolved);
 	}
 

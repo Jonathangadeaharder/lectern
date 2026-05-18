@@ -11,7 +11,7 @@ import { resolveDataDir } from '$lib/server/config/paths';
  * Accounts:
  *   - `llm.quick`        — quick-start LLM token (#7)
  *   - `github`           — GitHub PAT (#3)
- *   - `gitlab:<host>`    — GitLab PAT per host (deferred to v1.1; placeholder)
+ *   - `gitlab:<host>`    — GitLab PAT per host
  */
 import keytar from 'keytar';
 

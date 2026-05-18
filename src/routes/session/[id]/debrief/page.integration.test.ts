@@ -38,7 +38,9 @@ describe('Debrief + /api/sessions/:id/debrief', () => {
 	});
 
 	it('handles 404 gracefully', async () => {
-		server.use(http.get('/api/sessions/:id/debrief', () => HttpResponse.json({}, { status: 404 })));
+		server.use(
+			http.get('/api/sessions/:id/debrief', () => HttpResponse.json({}, { status: 404 }))
+		);
 		render(Debrief, { data: { sessionId: 'abc' } });
 		await waitFor(() => {
 			expect(screen.getByText(/No debrief available/)).toBeInTheDocument();

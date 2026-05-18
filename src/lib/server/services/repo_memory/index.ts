@@ -1,31 +1,26 @@
-import { eq } from 'drizzle-orm';
 import { randomUUID } from 'node:crypto';
+import { eq } from 'drizzle-orm';
 import { readFile, stat } from 'node:fs/promises';
 import { join } from 'node:path';
 import { getDb } from '../../db';
 import {
+	answers,
+	bundles,
 	repoConventions,
 	repoWeakSpots,
 	sessionQuestions,
-	answers,
-	sessions,
-	bundles
+	sessions
 } from '../../db/schema';
+import { runText } from '../llm';
 
-export type ConventionSource =
-	| 'claude_md'
-	| 'cursorrules'
-	| 'agents_md'
-	| 'windsurfrules'
-	| 'contributing'
-	| 'readme'
-	| 'other';
+export type ConventionSource = 'claude_md' | 'cursorrules' | 'agents_md' | 'windsurfrules' | 'contributing' | 'readme' | 'other';
 
 const CONVENTION_FILES: Array<{ path: string; source: ConventionSource }> = [
 	{ path: 'CLAUDE.md', source: 'claude_md' },
 	{ path: '.cursorrules', source: 'cursorrules' },
 	{ path: 'AGENTS.md', source: 'agents_md' },
 	{ path: '.windsurfrules', source: 'windsurfrules' },
+	{ path: 'CONTRIBUTING.md', source: 'contributing' },
 	{ path: 'README.md', source: 'readme' }
 ];
 
@@ -199,10 +194,37 @@ export function getWeakSpots(repoSlug: string): WeakSpotRow[] {
 		.all() as WeakSpotRow[];
 }
 
-export async function readConventionFiles(
-	repoPath: string,
-	repoSlugValue: string
-): Promise<RepoConventionRow[]> {
+export async function summarizeConvention(conventionId: string): Promise<string | null> {
+	const db = getDb();
+	const row = db
+		.select()
+		.from(repoConventions)
+		.where(eq(repoConventions.id, conventionId))
+		.get();
+	if (!row || !row.rawContent) return null;
+	if (row.rawContent.length < 200) return row.rawContent;
+
+	try {
+		const summary = await runText({
+			task: 'summarize_convention',
+			system: 'Summarize the following project convention/contributing guide in 2-4 bullet points. Focus on rules that affect code review: coding standards, testing requirements, commit message format, PR requirements, and architectural constraints.',
+			prompt: row.rawContent.slice(0, 4000),
+			temperature: 0,
+			maxTokens: 400
+		});
+
+		db.update(repoConventions)
+			.set({ summary })
+			.where(eq(repoConventions.id, conventionId))
+			.run();
+
+		return summary;
+	} catch {
+		return null;
+	}
+}
+
+export async function readConventionFiles(repoPath: string, repoSlugValue: string): Promise<RepoConventionRow[]> {
 	const results: RepoConventionRow[] = [];
 
 	for (const cf of CONVENTION_FILES) {
@@ -215,9 +237,7 @@ export async function readConventionFiles(
 
 			let processedContent = content;
 			if (cf.source === 'readme') {
-				const archMatch = content.match(
-					/##\s*(?:Architecture|Design|System\s+Overview)[\s\S]*?(?=##\s|$)/i
-				);
+				const archMatch = content.match(/##\s*(?:Architecture|Design|System\s+Overview)[\s\S]*?(?=##\s|$)/i);
 				if (archMatch) {
 					processedContent = archMatch[0]!;
 				} else {
