@@ -4,16 +4,16 @@ stages:
 pr_agent_job:
   stage: pr_agent
   tags:
-    - lectern
+    - docker
   image:
     name: pragent/pr-agent:latest
     entrypoint: [""]
   variables:
     CONFIG__GIT_PROVIDER: "gitlab"
-    CONFIG__MODEL: "gpt-5.1-EU"
-    CONFIG__FALLBACK_MODELS: '["gpt-5.1-EU"]'
-    OPENAI__API_TYPE: "azure"
-    OPENAI__API_VERSION: "2025-04-01-preview"
+    CONFIG__MODEL: "openai/cgm-eu"
+    CONFIG__CUSTOM_MODEL_MAX_TOKENS: "128000"
+    CONFIG__FALLBACK_MODELS: '["openai/cgm-eu"]'
+    LITELLM__DROP_PARAMS: "True"
     PR_REVIEWER__EXTRA_INSTRUCTIONS: "This is a SvelteKit + TypeScript project using Drizzle ORM with SQLite. Prefer idiomatic Svelte 5 runes syntax. The Python subdir uses Ruff. Review for security: never expose API keys or .env contents."
   script:
     - cd /app
@@ -23,7 +23,7 @@ pr_agent_job:
     - export gitlab__PERSONAL_ACCESS_TOKEN=$GITLAB_PERSONAL_ACCESS_TOKEN
     - export openai__key=$OPENAI_KEY
     - export openai__api_base=$OPENAI_API_BASE
-    - export openai__deployment_id=$OPENAI_DEPLOYMENT_ID
+    - export OPENAI_API_KEY=$OPENAI_KEY
     - python -m pr_agent.cli --pr_url="$MR_URL" describe
     - python -m pr_agent.cli --pr_url="$MR_URL" review
     - python -m pr_agent.cli --pr_url="$MR_URL" improve
