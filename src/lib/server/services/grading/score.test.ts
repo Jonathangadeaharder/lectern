@@ -1,25 +1,25 @@
-import { describe, it, expect } from 'vitest';
-import { computeScore, type ComputedScore } from './score';
+import { describe, expect, it } from 'vitest';
 import type { GradingResult, Rubric } from '../llm/schemas';
+import { computeScore } from './score';
 
-function makeRubric(overrides: Partial<Rubric> = {}): Rubric {
+function makeRubric(overrides?: Partial<Rubric>): Rubric {
 	return {
 		requiredPoints: [
-			{ id: 'r1', text: 'First requirement', weight: 1 },
-			{ id: 'r2', text: 'Second requirement', weight: 2 }
+			{ id: 'r1', text: 'Required 1', weight: 1 },
+			{ id: 'r2', text: 'Required 2', weight: 2 }
 		],
 		bonusPoints: [],
 		disqualifiers: [],
-		referenceAnswer: 'Test reference answer',
+		referenceAnswer: 'test answer',
 		scoring: {
 			passThreshold: 0.7,
-			borderlineBand: [0.4, 0.7] as [number, number]
+			borderlineBand: [0.4, 0.7]
 		},
 		...overrides
 	};
 }
 
-function makeResult(overrides: Partial<GradingResult> = {}): GradingResult {
+function makeResult(overrides?: Partial<GradingResult>): GradingResult {
 	return {
 		requiredResults: [],
 		bonusResults: [],
@@ -45,6 +45,23 @@ describe('computeScore', () => {
 		expect(score.verdict).toBe('pass');
 	});
 
+	it('returns pass with high confidence when all required met', () => {
+		const rubric = makeRubric({ requiredPoints: [
+			{ id: 'r1', text: 'Required 1', weight: 1 },
+			{ id: 'r2', text: 'Required 2', weight: 1 }
+		]});
+		const result = makeResult({
+			requiredResults: [
+				{ id: 'r1', met: 'yes', justification: 'ok' },
+				{ id: 'r2', met: 'yes', justification: 'ok' }
+			]
+		});
+		const score = computeScore(rubric, result);
+		expect(score.rawScore).toBe(1);
+		expect(score.verdict).toBe('pass');
+		expect(score.confidence).toBe(1.0);
+	});
+
 	it('returns zero score when all requirements missed', () => {
 		const rubric = makeRubric();
 		const result = makeResult({
@@ -58,10 +75,21 @@ describe('computeScore', () => {
 		expect(score.verdict).toBe('fail');
 	});
 
+	it('returns borderline when score is in borderline band', () => {
+		const rubric = makeRubric();
+		const result = makeResult({
+			requiredResults: [
+				{ id: 'r1', met: 'yes', justification: '' },
+				{ id: 'r2', met: 'partial', justification: '' }
+			]
+		});
+		const score = computeScore(rubric, result);
+		expect(score.rawScore).toBeCloseTo(2 / 3, 2);
+		expect(score.verdict).toBe('borderline');
+	});
+
 	it('computes weighted partial score', () => {
 		const rubric = makeRubric();
-		// r1 weight=1 met=yes (1*1=1), r2 weight=2 met=no (2*0=0)
-		// total = 1/3 ≈ 0.333
 		const result = makeResult({
 			requiredResults: [
 				{ id: 'r1', met: 'yes', justification: 'ok' },
@@ -70,13 +98,11 @@ describe('computeScore', () => {
 		});
 		const score = computeScore(rubric, result);
 		expect(score.rawScore).toBeCloseTo(1 / 3, 2);
-		expect(score.verdict).toBe('fail'); // < 0.4
+		expect(score.verdict).toBe('fail');
 	});
 
 	it('treats partial as 0.5 weight', () => {
 		const rubric = makeRubric();
-		// r1 weight=1 met=partial (1*0.5=0.5), r2 weight=2 met=yes (2*1=2)
-		// total = 2.5/3 ≈ 0.833
 		const result = makeResult({
 			requiredResults: [
 				{ id: 'r1', met: 'partial', justification: 'partial' },
@@ -85,7 +111,7 @@ describe('computeScore', () => {
 		});
 		const score = computeScore(rubric, result);
 		expect(score.rawScore).toBeCloseTo(2.5 / 3, 2);
-		expect(score.verdict).toBe('pass'); // >= 0.7
+		expect(score.verdict).toBe('pass');
 	});
 
 	it('applies disqualifier penalty of 0.5 per triggered', () => {
@@ -100,9 +126,8 @@ describe('computeScore', () => {
 			disqualifierResults: [{ id: 'dq1', triggered: true, justification: 'did bad thing' }]
 		});
 		const score = computeScore(rubric, result);
-		// base=1.0, penalty=0.5, final=0.5
 		expect(score.rawScore).toBeCloseTo(0.5, 2);
-		expect(score.verdict).toBe('borderline'); // 0.4 <= 0.5 < 0.7
+		expect(score.verdict).toBe('borderline');
 	});
 
 	it('clamps score to [0, 1]', () => {
@@ -125,7 +150,7 @@ describe('computeScore', () => {
 			]
 		});
 		const score = computeScore(rubric, result);
-		expect(score.rawScore).toBe(0); // clamped, not negative
+		expect(score.rawScore).toBe(0);
 	});
 
 	it('ignores non-triggered disqualifiers', () => {
@@ -142,20 +167,6 @@ describe('computeScore', () => {
 		const score = computeScore(rubric, result);
 		expect(score.rawScore).toBe(1);
 		expect(score.verdict).toBe('pass');
-	});
-
-	it('returns borderline when score is in borderline band', () => {
-		const rubric = makeRubric();
-		// r1=yes (1*1=1), r2=partial (2*0.5=1) => 2/3 ≈ 0.667
-		const result = makeResult({
-			requiredResults: [
-				{ id: 'r1', met: 'yes', justification: '' },
-				{ id: 'r2', met: 'partial', justification: '' }
-			]
-		});
-		const score = computeScore(rubric, result);
-		expect(score.rawScore).toBeCloseTo(2 / 3, 2);
-		expect(score.verdict).toBe('borderline'); // 0.4 <= 0.667 < 0.7
 	});
 
 	it('handles missing required results gracefully', () => {
@@ -177,5 +188,61 @@ describe('computeScore', () => {
 		});
 		const score = computeScore(rubric, result);
 		expect(score.rawScore).toBe(1);
+	});
+
+	it('returns borderline with confidence when score in band', () => {
+		const rubric = makeRubric({ requiredPoints: [
+			{ id: 'r1', text: 'Required 1', weight: 1 },
+			{ id: 'r2', text: 'Required 2', weight: 1 }
+		], scoring: { passThreshold: 0.7, borderlineBand: [0.6, 0.7] }});
+		const result = makeResult({
+			requiredResults: [
+				{ id: 'r1', met: 'yes', justification: 'ok' },
+				{ id: 'r2', met: 'partial', justification: 'partial' }
+			]
+		});
+		const score = computeScore(rubric, result);
+		expect(score.rawScore).toBe(0.75);
+		expect(score.verdict).toBe('pass');
+		expect(score.confidence).toBe(0.8);
+	});
+
+	it('uses weighted scoring', () => {
+		const rubric = makeRubric({
+			requiredPoints: [
+				{ id: 'r1', text: 'Required 1', weight: 3 },
+				{ id: 'r2', text: 'Required 2', weight: 1 }
+			]
+		});
+		const result = makeResult({
+			requiredResults: [
+				{ id: 'r1', met: 'yes', justification: 'ok' },
+				{ id: 'r2', met: 'no', justification: 'missed' }
+			]
+		});
+		const score = computeScore(rubric, result);
+		expect(score.rawScore).toBe(0.75);
+	});
+
+	it('returns low confidence for empty results', () => {
+		const rubric = makeRubric();
+		const result = makeResult({ requiredResults: [] });
+		const score = computeScore(rubric, result);
+		expect(score.confidence).toBe(0.3);
+	});
+
+	it('returns 0.5 confidence for borderline', () => {
+		const rubric = makeRubric({
+			scoring: { passThreshold: 0.8, borderlineBand: [0.5, 0.8] }
+		});
+		const result = makeResult({
+			requiredResults: [
+				{ id: 'r1', met: 'yes', justification: 'ok' },
+				{ id: 'r2', met: 'no', justification: 'missed' }
+			]
+		});
+		const score = computeScore(rubric, result);
+		expect(score.verdict).toBe('borderline');
+		expect(score.confidence).toBe(0.5);
 	});
 });
