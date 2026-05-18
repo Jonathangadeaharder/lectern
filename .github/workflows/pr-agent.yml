@@ -1,0 +1,33 @@
+name: PR Agent
+on:
+  pull_request:
+    types: [opened, reopened, ready_for_review]
+  issue_comment:
+    types: [created]
+
+jobs:
+  pr_agent_job:
+    if: ${{ github.event.sender.type != 'Bot' }}
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+      pull-requests: write
+      contents: write
+    name: Run PR Agent on pull requests and comments
+    steps:
+      - name: PR Agent action step
+        id: pragent
+        uses: the-pr-agent/pr-agent@main
+        env:
+          OPENAI_KEY: ${{ secrets.OPENAI_KEY }}
+          OPENAI.API_TYPE: "azure"
+          OPENAI.API_VERSION: "2025-04-01-preview"
+          OPENAI.API_BASE: ${{ secrets.OPENAI_API_BASE }}
+          OPENAI.DEPLOYMENT_ID: ${{ secrets.OPENAI_DEPLOYMENT_ID }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          config.model: "gpt-5.1-EU"
+          config.fallback_models: '["gpt-5.1-EU"]'
+          github_action_config.auto_review: "true"
+          github_action_config.auto_describe: "true"
+          github_action_config.auto_improve: "true"
+          pr_reviewer.extra_instructions: "This is a SvelteKit + TypeScript project using Drizzle ORM with SQLite. Prefer idiomatic Svelte 5 runes syntax ($state, $derived, $effect, $props). The Python subdir uses Ruff. Review for security: never expose API keys or .env contents."
