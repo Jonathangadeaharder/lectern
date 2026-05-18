@@ -1,4 +1,4 @@
-import { sqliteTable, text, integer, real, uniqueIndex } from 'drizzle-orm/sqlite-core';
+import { sqliteTable, text, integer, real, uniqueIndex, index } from 'drizzle-orm/sqlite-core';
 
 export const skillMastery = sqliteTable(
 	'skill_mastery',
@@ -21,5 +21,22 @@ export const skillMastery = sqliteTable(
 	},
 	(t) => ({
 		tagRepoUq: uniqueIndex('skill_mastery_tag_repo_uq').on(t.tag, t.repoSlug)
+	})
+);
+
+export const masteryHistory = sqliteTable(
+	'mastery_history',
+	{
+		id: text('id').primaryKey(),
+		tag: text('tag').notNull(),
+		repoSlug: text('repo_slug'),
+		sessionId: text('session_id'),
+		ewmaScore: real('ewma_score').notNull(),
+		verdict: text('verdict'),
+		createdAt: integer('created_at').notNull()
+	},
+	(t) => ({
+		tagIdx: index('mastery_history_tag_idx').on(t.tag, t.repoSlug),
+		createdIdx: index('mastery_history_created_idx').on(t.createdAt)
 	})
 );

@@ -6,7 +6,7 @@ export const repoConventions = sqliteTable(
 		id: text('id').primaryKey(),
 		repoSlug: text('repo_slug').notNull(),
 		source: text('source', {
-			enum: ['claude_md', 'cursorrules', 'contributing', 'readme', 'other']
+			enum: ['claude_md', 'cursorrules', 'agents_md', 'windsurfrules', 'contributing', 'readme', 'other']
 		}).notNull(),
 		filePath: text('file_path').notNull(),
 		rawContent: text('raw_content').notNull(),

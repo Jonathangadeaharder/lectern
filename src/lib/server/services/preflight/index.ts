@@ -11,6 +11,10 @@ import {
 	runReview,
 	type PrAgentReview
 } from '../pr_agent';
+import { readBundleManifest } from '../ingestion/bundle';
+
+const LARGE_PR_FILE_THRESHOLD = 20;
+const LARGE_FILE_LINE_THRESHOLD = 500;
 
 const TIERS: Record<'blocker' | 'major' | 'minor', readonly string[]> = {
 	blocker: [
@@ -105,6 +109,9 @@ export async function runPreflight(
 		});
 	}
 
+	const sizeCheck = await checkPrSize(bundle.filePath);
+	if (sizeCheck) return persistAndReturn(sizeCheck);
+
 	let review: PrAgentReview;
 	try {
 		review = await runReview({ bundleId, signal: opts.signal });
@@ -189,4 +196,59 @@ export function recordOverride(preflightResultId: string): void {
 			createdAt: Date.now()
 		})
 		.run();
+}
+
+async function checkPrSize(
+	bundleFilePath: string
+): Promise<Omit<PreflightResult, 'id' | 'createdAt'> | null> {
+	try {
+		const manifest = await readBundleManifest(bundleFilePath);
+		if (!manifest) return null;
+
+		const fileCount = manifest.files.filter((f) => !f.binary).length;
+		const largeFiles = manifest.files.filter(
+			(f) => !f.binary && (f.headSize > LARGE_FILE_LINE_THRESHOLD * 30 || f.baseSize > LARGE_FILE_LINE_THRESHOLD * 30)
+		);
+
+		if (largeFiles.length > 0) {
+			return {
+				bundleId: '',
+				headSha: '',
+				decision: 'block',
+				counts: { blocker: largeFiles.length, major: 0, minor: 0 },
+				findings: largeFiles.map((f, i) => ({
+					id: `size-block-${i}`,
+					category: 'oversized_file',
+					severityHint: 'blocker' as const,
+					file: f.path,
+					message: `File exceeds ${LARGE_FILE_LINE_THRESHOLD} lines — review quality degraded`,
+					suggestion: 'Split into smaller files before review'
+				})),
+				summary: `BLOCKED: ${largeFiles.length} file(s) exceed ${LARGE_FILE_LINE_THRESHOLD} lines`
+			};
+		}
+
+		if (fileCount > LARGE_PR_FILE_THRESHOLD) {
+			return {
+				bundleId: '',
+				headSha: '',
+				decision: 'warn',
+				counts: { blocker: 0, major: 1, minor: 0 },
+				findings: [
+					{
+						id: 'size-warn-files',
+						category: 'large_pr',
+						severityHint: 'major' as const,
+						message: `PR changes ${fileCount} files (threshold: ${LARGE_PR_FILE_THRESHOLD})`,
+						suggestion: 'Consider splitting into smaller PRs for better review coverage'
+					}
+				],
+				summary: `WARN: ${fileCount} files changed (threshold: ${LARGE_PR_FILE_THRESHOLD})`
+			};
+		}
+
+		return null;
+	} catch {
+		return null;
+	}
 }

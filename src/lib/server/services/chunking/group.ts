@@ -3,6 +3,66 @@ import { createHash } from 'node:crypto';
 
 const TEST_FILE_RE = /(__tests?__|\.test\.|\.spec\.|tests?\/|_test\.\w+$|test_[\w-]+\.\w+$)/i;
 
+const LANG_RE = /\.(tsx?|jsx?|py|rb|go|rs|java|kt|swift|c|cpp|h|hpp|cs|php|pl|sh|sql|yaml|yml|json|toml|zig|nim|ex|exs|hs|ml|sc|scala|lua|r|dart|vue|svelte)$/i;
+
+const IMPORT_RELATIVE_RE = /(?:import\s+.*?(?:from|)\s+['"]\.\/([^'"]+)['"]|require\s*\(\s*['"]\.\/([^'"]+)['"]\s*\)|from\s+['"]\.\/([^'"]+)['"]\s+import)/g;
+
+function extractLanguage(path: string): string {
+	const m = LANG_RE.exec(path);
+	if (!m) return 'unknown';
+	const ext = m[1]!.toLowerCase();
+	const map: Record<string, string> = {
+		ts: 'typescript', tsx: 'typescript', js: 'javascript', jsx: 'javascript',
+		py: 'python', rb: 'ruby', go: 'go', rs: 'rust', java: 'java', kt: 'kotlin',
+		swift: 'swift', c: 'c', cpp: 'cpp', h: 'c', hpp: 'cpp', cs: 'csharp',
+		php: 'php', svelte: 'svelte', vue: 'vue', dart: 'dart', scala: 'scala',
+		hs: 'haskell', ex: 'elixir', exs: 'elixir', zig: 'zig'
+	};
+	return map[ext] ?? ext;
+}
+
+function extractModule(path: string): string {
+	const parts = path.split('/');
+	if (parts.length <= 1) return '';
+	return parts.slice(0, -1).join('/');
+}
+
+function extractRelativeImportsFromHunks(hunks: Hunk[]): string[] {
+	const imports = new Set<string>();
+	for (const h of hunks) {
+		for (const line of h.lines) {
+			if (line.type === 'del') continue;
+			IMPORT_RELATIVE_RE.lastIndex = 0;
+			let m: RegExpExecArray | null;
+			while ((m = IMPORT_RELATIVE_RE.exec(line.content)) !== null) {
+				const imp = m[1] ?? m[2] ?? m[3];
+				if (imp) imports.add(imp);
+			}
+		}
+	}
+	return [...imports];
+}
+
+function resolveImportPath(fromFile: string, importPath: string): string {
+	const dir = fromFile.split('/').slice(0, -1).join('/');
+	const resolved = dir ? `${dir}/${importPath}` : importPath;
+	const normalized = resolved.replace(/\/\.\//g, '/').replace(/\/[^/]+\/\.\.\//g, '/');
+	for (const ext of ['', '.ts', '.tsx', '.js', '.jsx', '.svelte', '.py', '.rs', '.go']) {
+		const candidate = `${normalized}${ext}`;
+		const idx = candidate.indexOf('/');
+		if (idx >= 0) return candidate;
+	}
+	return normalized;
+}
+
+function computeComplexity(hunks: Hunk[]): number {
+	let total = 0;
+	for (const h of hunks) {
+		total += h.addedLines * 0.1 + h.removedLines * 0.05;
+	}
+	return Math.round(total * 10) / 10;
+}
+
 export function isTestFile(path: string): boolean {
 	return TEST_FILE_RE.test(path);
 }
@@ -81,9 +141,52 @@ export function groupHunksToChunks(hunks: Hunk[]): Chunk[] {
 		}
 	}
 
+	// Import-based grouping: merge groups that import each other
+	const groupImports = new Map<string[], string[]>();
+	for (const g of merged) {
+		const allHunks = g.files.flatMap((f) => byFile.get(f) ?? []);
+		const relImports = extractRelativeImportsFromHunks(allHunks);
+		const resolved = relImports
+			.map((imp) => g.files.map((f) => resolveImportPath(f, imp)))
+			.flat();
+		groupImports.set(g.files, resolved);
+	}
+
+	const importMerged = [...merged];
+	let changed = true;
+	while (changed) {
+		changed = false;
+		for (let i = 0; i < importMerged.length; i++) {
+			for (let j = i + 1; j < importMerged.length; j++) {
+				const gi = importMerged[i]!;
+				const gj = importMerged[j]!;
+				const iImportsJ = gi.files.some((f) =>
+					gj.files.some((gf) => gf.endsWith(f.split('/').pop()!))
+				);
+				const jImportsI = gj.files.some((f) =>
+					gi.files.some((gf) => gf.endsWith(f.split('/').pop()!))
+				);
+				const iResolvesToJ = (groupImports.get(gi.files) ?? []).some((imp) =>
+					gj.files.some((gf) => gf === imp || gf === `${imp}.ts` || gf === `${imp}.tsx`)
+				);
+				if (iImportsJ || jImportsI || iResolvesToJ) {
+					const combined = {
+						files: [...new Set([...gi.files, ...gj.files])],
+						hunks: [...gi.hunks, ...gj.hunks]
+					};
+					importMerged.splice(j, 1);
+					importMerged.splice(i, 1, combined);
+					changed = true;
+					break;
+				}
+			}
+			if (changed) break;
+		}
+	}
+
 	// Sizing pass: split groups whose estimate exceeds 15min, merge any <3min adjacent same-file.
 	const sized: { files: string[]; hunks: Hunk[] }[] = [];
-	for (const g of merged) {
+	for (const g of importMerged) {
 		const minutes = estimateMinutes(g.hunks);
 		if (minutes <= 15) {
 			sized.push(g);
@@ -120,15 +223,21 @@ export function groupHunksToChunks(hunks: Hunk[]): Chunk[] {
 	const chunks: Chunk[] = compacted.map((g, idx) => {
 		const hunkIds = g.hunks.map((h) => h.id);
 		const isTestChunk = g.files.every(isTestFile);
+		const allHunks = g.files.flatMap((f) => byFile.get(f) ?? []);
+		const languages = [...new Set(g.files.map(extractLanguage))];
+		const modules = [...new Set(g.files.map(extractModule).filter(Boolean))];
 		return {
 			id: chunkId(hunkIds),
 			index: idx,
-			title: '', // filled by LLM titles step
+			title: '',
 			rationale: '',
 			hunks: g.hunks,
 			estimatedMinutes: Math.round(estimateMinutes(g.hunks) * 10) / 10,
 			primaryFiles: [...new Set(g.files)],
-			tags: isTestChunk ? ['test'] : ['impl']
+			tags: isTestChunk ? ['test'] : ['impl'],
+			complexity: computeComplexity(allHunks),
+			languages,
+			modules
 		};
 	});
 

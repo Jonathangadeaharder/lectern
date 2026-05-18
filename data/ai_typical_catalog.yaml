@@ -1,0 +1,73 @@
+# AI-typical bug patterns catalog
+# Patterns commonly introduced by AI code generation
+version: "1"
+
+patterns:
+  - id: hallucinated_api
+    summary: "Calls to non-existent API methods or functions"
+    description: "AI generates calls to library APIs that don't exist or uses wrong method signatures"
+    root_cause: "Training data contains deprecated or fabricated API surfaces"
+    file_globs:
+      - "**/*.ts"
+      - "**/*.py"
+      - "**/*.js"
+    confidence: 0.85
+
+  - id: fabricated_imports
+    summary: "Imports from packages that don't exist or wrong module paths"
+    description: "AI invents import paths or uses packages not in dependencies"
+    root_cause: "Confabulation of package structure from partial training data"
+    file_globs:
+      - "**/*.ts"
+      - "**/*.py"
+      - "**/*.js"
+    confidence: 0.8
+
+  - id: insecure_defaults
+    summary: "Insecure default configurations (hardcoded secrets, open CORS, no auth)"
+    description: "AI suggests security-sensitive defaults that are permissive or dangerous"
+    root_cause: "Training data includes tutorial/example code that prioritizes simplicity over security"
+    file_globs:
+      - "**/*.ts"
+      - "**/*.py"
+      - "**/config.*"
+    confidence: 0.75
+
+  - id: contextual_blindness
+    summary: "Code that ignores surrounding context (wrong framework version, mismatched patterns)"
+    description: "AI generates code inconsistent with the existing codebase conventions or framework version"
+    root_cause: "Limited context window; AI doesn't see full project structure"
+    file_globs:
+      - "**/*.ts"
+      - "**/*.svelte"
+      - "**/*.py"
+    confidence: 0.7
+
+  - id: architectural_drift
+    summary: "Code that violates established architectural patterns"
+    description: "AI introduces patterns that conflict with the project's architecture (e.g., adding ORM in a raw-SQL project)"
+    root_cause: "AI defaults to most common patterns rather than matching project conventions"
+    file_globs:
+      - "**/*.ts"
+      - "**/*.py"
+    confidence: 0.65
+
+  - id: error_swallowing
+    summary: "Catch blocks that silently swallow errors or use overly broad exception handling"
+    description: "AI generates empty catch blocks, catch-all exceptions, or logs without re-raising"
+    root_cause: "Training data contains defensive patterns without proper error propagation"
+    file_globs:
+      - "**/*.ts"
+      - "**/*.py"
+      - "**/*.go"
+    confidence: 0.75
+
+  - id: plausible_but_wrong
+    summary: "Code that looks correct but has subtle logical errors"
+    description: "Off-by-one, wrong comparison operator, reversed condition, or subtle type coercion bugs"
+    root_cause: "Statistical text generation produces syntactically valid but semantically wrong code"
+    file_globs:
+      - "**/*.ts"
+      - "**/*.py"
+      - "**/*.rs"
+    confidence: 0.7

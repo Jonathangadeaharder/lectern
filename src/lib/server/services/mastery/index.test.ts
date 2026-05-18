@@ -19,12 +19,12 @@ describe('ewma', () => {
 		expect(score).toBeGreaterThan(0.99);
 	});
 
-	it('converges to 0 on repeated fails', () => {
+	it('converges to floor on repeated fails', () => {
 		let score = 0.5;
 		for (let i = 0; i < 100; i++) {
 			score = ewma(score, 0);
 		}
-		expect(score).toBeLessThan(0.01);
+		expect(score).toBe(0.3);
 	});
 });
 
@@ -67,8 +67,8 @@ describe('decayScore', () => {
 		expect(long).toBeLessThan(short);
 	});
 
-	it('never reaches zero', () => {
+	it('never drops below floor', () => {
 		const result = decayScore(0.8, 365);
-		expect(result).toBeGreaterThan(0);
+		expect(result).toBeGreaterThanOrEqual(0.3);
 	});
 });
