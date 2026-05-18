@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
 	import Icon from '$lib/client/Icon.svelte';
 	import { averageScore, intensity, scorePercent } from '$lib/client/dashboard-helpers';
 	import type { PageData } from './$types';
@@ -6,12 +7,15 @@
 	let { data }: { data: PageData } = $props();
 	const d = $derived(data.dashboard);
 
-	const today = new Date();
-	const dateLabel = today.toLocaleDateString('en-US', {
-		weekday: 'long',
-		month: 'long',
-		day: 'numeric',
-		year: 'numeric'
+	let dateLabel = $state('');
+
+	onMount(() => {
+		dateLabel = new Date().toLocaleDateString('en-US', {
+			weekday: 'long',
+			month: 'long',
+			day: 'numeric',
+			year: 'numeric'
+		});
 	});
 
 	const totalAttempts = $derived(d.totalQuestions);

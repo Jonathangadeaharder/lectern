@@ -247,7 +247,7 @@
 }
 
 /* Animations */
-@keyframes fadeUp {
+@keyframes fade-up {
 	from {
 		opacity: 0;
 		transform: translateY(8px);
@@ -257,7 +257,7 @@
 		transform: translateY(0);
 	}
 }
-@keyframes lecternPulse {
+@keyframes lectern-pulse {
 	0%,
 	100% {
 		opacity: 1;
@@ -274,7 +274,7 @@
 		background-position: 200% 0;
 	}
 }
-@keyframes drawIn {
+@keyframes draw-in {
 	from {
 		stroke-dashoffset: var(--len, 1000);
 	}
@@ -282,7 +282,7 @@
 		stroke-dashoffset: 0;
 	}
 }
-@keyframes flashSuccess {
+@keyframes flash-success {
 	0% {
 		box-shadow: 0 0 0 0 hsl(var(--state-success) / 0);
 	}
@@ -293,7 +293,7 @@
 		box-shadow: 0 0 0 12px hsl(var(--state-success) / 0);
 	}
 }
-@keyframes flashError {
+@keyframes flash-error {
 	0%,
 	100% {
 		transform: translateX(0);
@@ -313,7 +313,7 @@
 }
 
 .fade-up {
-	animation: fadeUp var(--duration-slower) var(--ease-out) both;
+	animation: fade-up var(--duration-slower) var(--ease-out) both;
 }
 
 @media (prefers-reduced-motion: reduce) {
