@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { page } from '$app/stores';
+
+	let { data } = $props();
 
 	interface Debrief {
 		sessionId: string;
@@ -23,9 +24,8 @@
 	let loading = $state(true);
 
 	onMount(async () => {
-		const id = $page.params.id;
 		try {
-			const res = await fetch(`/api/sessions/${id}/debrief`);
+			const res = await fetch(`/api/sessions/${data.sessionId}/debrief`);
 			if (res.ok) debrief = await res.json();
 		} finally {
 			loading = false;
@@ -49,6 +49,19 @@
 				? 'text-state-warning'
 				: 'text-state-error'
 	);
+
+	const scoreDistribution = $derived.by(() => {
+		if (!debrief) return { high: 0, medium: 0, low: 0 };
+		let high = 0;
+		let medium = 0;
+		let low = 0;
+		for (const c of debrief.perChunk) {
+			if (c.score >= 0.8) high++;
+			else if (c.score >= 0.5) medium++;
+			else low++;
+		}
+		return { high, medium, low };
+	});
 </script>
 
 <main class="mx-auto flex max-w-2xl flex-col gap-6 px-6 py-12">
@@ -100,6 +113,40 @@
 				</ul>
 			</section>
 		{/if}
+
+		<section class="flex flex-col gap-2">
+			<h2 class="text-base font-medium text-text-primary">Confidence calibration</h2>
+			<div class="rounded-md border border-border bg-surface-1 p-4">
+				<div class="mb-3 flex items-end gap-1" style:height="80px">
+					{#each debrief.perChunk as c (c.chunkId)}
+						<div
+							class="flex-1 rounded-t-sm transition-all
+								{c.score >= 0.8 ? 'bg-state-success' : c.score >= 0.5 ? 'bg-state-warning' : 'bg-state-error'}"
+							style:height="{Math.max(4, c.score * 100)}%"
+							title="{c.title}: {(c.score * 100).toFixed(0)}%"
+						></div>
+					{/each}
+				</div>
+				<div class="flex justify-between text-xs text-text-muted">
+					<span>Chunks</span>
+					<span>Score %</span>
+				</div>
+				<div class="mt-3 flex gap-4 text-sm">
+					<span class="flex items-center gap-1">
+						<span class="inline-block h-2 w-2 rounded-full bg-state-success"></span>
+						High ({scoreDistribution.high})
+					</span>
+					<span class="flex items-center gap-1">
+						<span class="inline-block h-2 w-2 rounded-full bg-state-warning"></span>
+						Medium ({scoreDistribution.medium})
+					</span>
+					<span class="flex items-center gap-1">
+						<span class="inline-block h-2 w-2 rounded-full bg-state-error"></span>
+						Low ({scoreDistribution.low})
+					</span>
+				</div>
+			</div>
+		</section>
 
 		<section class="flex flex-col gap-2">
 			<h2 class="text-base font-medium text-text-primary">Suggested follow-ups</h2>
