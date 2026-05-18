@@ -5,6 +5,7 @@
 	import FreeText from '$lib/components/session/FreeText.svelte';
 	import ClickLines from '$lib/components/session/ClickLines.svelte';
 	import DiffViewer from '$lib/components/session/DiffViewer.svelte';
+	import { setEnabled, getEnabled } from '$lib/client/sound';
 
 	let { data } = $props();
 	const sessionId = $derived(data.sessionId);
@@ -124,6 +125,14 @@
 			paused = false;
 			transition('resume');
 			return;
+		}
+
+		if (e.key === 'm' || e.key === 'M') {
+			if (e.metaKey || e.ctrlKey) {
+				e.preventDefault();
+				setEnabled(!getEnabled());
+				return;
+			}
 		}
 
 		if ((e.key === 'p' || e.key === 'P') && (e.metaKey || e.ctrlKey)) {
