@@ -1,0 +1,51 @@
+@import '@fontsource-variable/geist';
+@import '@fontsource-variable/geist-mono';
+@import './lib/styles/tokens.css';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+	html {
+		font-family: var(--font-sans);
+		font-size: 14px;
+		color: hsl(var(--text-primary));
+		background-color: hsl(var(--surface-0));
+		-webkit-font-smoothing: antialiased;
+		-moz-osx-font-smoothing: grayscale;
+	}
+
+	body {
+		min-height: 100vh;
+	}
+
+	*:focus-visible {
+		outline: 2px solid hsl(var(--accent));
+		outline-offset: 2px;
+		border-radius: inherit;
+	}
+
+	*:focus:not(:focus-visible) {
+		outline: none;
+	}
+
+	code,
+	pre,
+	kbd,
+	samp {
+		font-family: var(--font-mono);
+		font-variant-numeric: tabular-nums;
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	*,
+	*::before,
+	*::after {
+		transition-duration: 50ms !important;
+		animation-duration: 50ms !important;
+		animation-iteration-count: 1 !important;
+		scroll-behavior: auto !important;
+	}
+}

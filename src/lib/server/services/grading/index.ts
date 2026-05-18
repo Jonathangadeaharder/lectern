@@ -1,0 +1,277 @@
+import { eq } from 'drizzle-orm';
+import { randomUUID } from 'node:crypto';
+import { getDb } from '../../db';
+import { answers, sessionQuestions } from '../../db/schema';
+import { runStructured, streamStructured } from '../llm';
+import { LlmAbortError, LlmSchemaError } from '../llm/errors';
+import { GradingResultSchema, type GradingResult, type Question, type Rubric } from '../llm/schemas';
+import * as gradePrompt from '../llm/prompts/grade_freetext';
+import { computeScore } from './score';
+
+export interface ClickLinesPayload {
+	marked: Array<{ file: string; line: number }>;
+}
+export interface MultipleChoicePayload {
+	selectedOptionId: string;
+}
+export interface FreeTextPayload {
+	answer: string;
+}
+export type AnswerPayload = ClickLinesPayload | MultipleChoicePayload | FreeTextPayload;
+
+export interface GradeArgs {
+	sessionId: string;
+	questionId: string;
+	payload: AnswerPayload;
+	signal?: AbortSignal;
+}
+
+export async function gradeAnswer(args: GradeArgs): Promise<GradingResult> {
+	const { question, rubric } = loadQuestion(args.questionId);
+	let final: GradingResult;
+
+	switch (question.format) {
+		case 'multiple_choice':
+			final = gradeMultipleChoice(question, args.payload as MultipleChoicePayload);
+			break;
+		case 'click_lines':
+			final = gradeClickLines(question, args.payload as ClickLinesPayload);
+			break;
+		case 'free_text':
+			if (!rubric) throw new Error(`free_text question ${question.id} has no rubric`);
+			final = await gradeFreeText({
+				question,
+				rubric,
+				answer: (args.payload as FreeTextPayload).answer,
+				signal: args.signal
+			});
+			break;
+		default:
+			throw new Error(`unsupported format: ${question.format}`);
+	}
+
+	persistAnswer(args, final);
+	return final;
+}
+
+export async function* streamGradeFreeText(args: {
+	sessionId: string;
+	questionId: string;
+	answer: string;
+	signal?: AbortSignal;
+}): AsyncGenerator<{ partial?: Partial<GradingResult>; final?: GradingResult }> {
+	const { question, rubric } = loadQuestion(args.questionId);
+	if (!rubric) throw new Error(`question has no rubric: ${args.questionId}`);
+
+	const userPrompt = gradePrompt.buildUser({
+		prompt: question.prompt,
+		chunkDiff: '(diff omitted in v1)',
+		rubricJson: JSON.stringify(rubric),
+		userAnswer: args.answer
+	});
+
+	let stream;
+	try {
+		stream = await streamStructured({
+			task: 'grade_freetext',
+			schema: GradingResultSchema,
+			system: gradePrompt.system,
+			prompt: userPrompt,
+			signal: args.signal
+		});
+	} catch (e) {
+		if (e instanceof LlmAbortError) throw e;
+		// Retry-once on schema/provider errors.
+		stream = await streamStructured({
+			task: 'grade_freetext',
+			schema: GradingResultSchema,
+			system: gradePrompt.system + '\n\nOutput JSON matching the schema EXACTLY.',
+			prompt: userPrompt,
+			signal: args.signal
+		});
+	}
+
+	for await (const partial of stream.partialObjectStream) {
+		yield { partial: partial as Partial<GradingResult> };
+	}
+
+	let llmFinal: GradingResult;
+	try {
+		llmFinal = (await stream.object) as GradingResult;
+	} catch (e) {
+		if (e instanceof LlmSchemaError) {
+			llmFinal = borderlineFallback();
+		} else {
+			throw e;
+		}
+	}
+
+	const computed = computeScore(rubric, llmFinal);
+	const result: GradingResult = {
+		...llmFinal,
+		rawScore: computed.rawScore,
+		verdict: computed.verdict
+	};
+
+	persistAnswer(
+		{ sessionId: args.sessionId, questionId: args.questionId, payload: { answer: args.answer } },
+		result
+	);
+	yield { final: result };
+}
+
+async function gradeFreeText(args: {
+	question: Question;
+	rubric: Rubric;
+	answer: string;
+	signal?: AbortSignal;
+}): Promise<GradingResult> {
+	const userPrompt = gradePrompt.buildUser({
+		prompt: args.question.prompt,
+		chunkDiff: '(diff omitted in v1)',
+		rubricJson: JSON.stringify(args.rubric),
+		userAnswer: args.answer
+	});
+
+	let llm: GradingResult;
+	try {
+		llm = await runStructured({
+			task: 'grade_freetext',
+			schema: GradingResultSchema,
+			system: gradePrompt.system,
+			prompt: userPrompt,
+			signal: args.signal
+		});
+	} catch (e) {
+		if (e instanceof LlmSchemaError) {
+			llm = await runStructured({
+				task: 'grade_freetext',
+				schema: GradingResultSchema,
+				system: gradePrompt.system + '\n\nOutput JSON matching the schema EXACTLY.',
+				prompt: userPrompt,
+				signal: args.signal
+			}).catch(() => borderlineFallback());
+		} else {
+			throw e;
+		}
+	}
+
+	const computed = computeScore(args.rubric, llm);
+	return { ...llm, rawScore: computed.rawScore, verdict: computed.verdict };
+}
+
+function gradeMultipleChoice(question: Question, payload: MultipleChoicePayload): GradingResult {
+	const correct = (question.options ?? []).find((o) => o.correct);
+	const isCorrect = correct?.id === payload.selectedOptionId;
+	return {
+		requiredResults: [
+			{
+				id: 'mc-correct',
+				met: isCorrect ? 'yes' : 'no',
+				justification: isCorrect ? 'Selected the correct option.' : 'Wrong option.'
+			}
+		],
+		bonusResults: [],
+		disqualifierResults: [],
+		rawScore: isCorrect ? 1 : 0,
+		verdict: isCorrect ? 'pass' : 'fail',
+		feedback: correct?.explanation ?? (isCorrect ? 'Correct.' : 'Incorrect.')
+	};
+}
+
+function gradeClickLines(question: Question, payload: ClickLinesPayload): GradingResult {
+	const expected = (question.expectedLines ?? []).map((l) => `${l.file}:${l.line}`);
+	const expectedSet = new Set(expected);
+	const marked = payload.marked.map((l) => `${l.file}:${l.line}`);
+	const markedSet = new Set(marked);
+
+	const tp = expected.filter((e) => markedSet.has(e)).length;
+	const precision = markedSet.size > 0 ? tp / markedSet.size : 0;
+	const recall = expectedSet.size > 0 ? tp / expectedSet.size : 0;
+	const raw = 0.5 * precision + 0.5 * recall;
+
+	const verdict: GradingResult['verdict'] = raw >= 0.8 ? 'pass' : raw >= 0.5 ? 'borderline' : 'fail';
+	const missed = expected.filter((e) => !markedSet.has(e));
+	const wrong = marked.filter((m) => !expectedSet.has(m));
+
+	return {
+		requiredResults: [
+			{
+				id: 'cl-precision',
+				met: precision >= 0.8 ? 'yes' : precision >= 0.5 ? 'partial' : 'no',
+				justification: `precision ${precision.toFixed(2)} (${tp} of ${markedSet.size} marked correct)`
+			},
+			{
+				id: 'cl-recall',
+				met: recall >= 0.8 ? 'yes' : recall >= 0.5 ? 'partial' : 'no',
+				justification: `recall ${recall.toFixed(2)} (${tp} of ${expectedSet.size} expected found)`
+			}
+		],
+		bonusResults: [],
+		disqualifierResults: [],
+		rawScore: raw,
+		verdict,
+		feedback: [
+			`Score: ${raw.toFixed(2)}`,
+			missed.length ? `Missed: ${missed.join(', ')}` : null,
+			wrong.length ? `Extra: ${wrong.join(', ')}` : null
+		]
+			.filter(Boolean)
+			.join(' • ')
+	};
+}
+
+function borderlineFallback(): GradingResult {
+	return {
+		requiredResults: [],
+		bonusResults: [],
+		disqualifierResults: [],
+		rawScore: 0.6,
+		verdict: 'borderline',
+		feedback: 'Grader output unstable; treating as borderline.'
+	};
+}
+
+function loadQuestion(questionId: string): { question: Question; rubric: Rubric | null } {
+	const db = getDb();
+	const row = db
+		.select()
+		.from(sessionQuestions)
+		.where(eq(sessionQuestions.id, questionId))
+		.get();
+	if (!row) throw new Error(`question not found: ${questionId}`);
+	const question = JSON.parse(row.promptJson) as Question;
+	const rubric = row.rubricJson ? (JSON.parse(row.rubricJson) as Rubric) : null;
+	return { question, rubric };
+}
+
+function persistAnswer(
+	args: { sessionId: string; questionId: string; payload: AnswerPayload },
+	result: GradingResult
+): void {
+	const db = getDb();
+	const now = Date.now();
+	db.transaction((tx) => {
+		tx.insert(answers)
+			.values({
+				id: randomUUID(),
+				sessionId: args.sessionId,
+				questionId: args.questionId,
+				format: 'unknown',
+				payloadJson: JSON.stringify(args.payload),
+				gradingJson: JSON.stringify(result),
+				rawScore: result.rawScore,
+				verdict: result.verdict,
+				submittedAt: now,
+				gradedAt: now
+			})
+			.run();
+
+		tx.update(sessionQuestions)
+			.set({ status: 'graded', submittedAt: now, gradedAt: now })
+			.where(eq(sessionQuestions.id, args.questionId))
+			.run();
+	});
+}
+
+export type { GradingResult } from '../llm/schemas';

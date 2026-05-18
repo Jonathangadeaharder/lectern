@@ -1,0 +1,50 @@
+import type { GradingResult, Rubric } from '../llm/schemas';
+
+const VERDICT_VALUE: Record<'yes' | 'partial' | 'no', number> = {
+	yes: 1,
+	partial: 0.5,
+	no: 0
+};
+
+export interface ComputedScore {
+	rawScore: number;
+	verdict: 'pass' | 'fail' | 'borderline' | 'review_needed';
+}
+
+/**
+ * Deterministic server-side score. Overrides the LLM's `rawScore` and `verdict` claims.
+ *
+ * v1.0 formula:
+ *   reqScore = sum(weight * yesValue) / sum(weight)
+ *   dqPenalty = 0.5 * count(triggered disqualifiers)
+ *   raw      = clamp(reqScore - dqPenalty, 0, 1)
+ *   bonus is gathered for display but does NOT boost score in v1.
+ */
+export function computeScore(rubric: Rubric, result: GradingResult): ComputedScore {
+	const reqMaxWeight = rubric.requiredPoints.reduce((s, p) => s + p.weight, 0) || 1;
+	const reqWeightById = new Map(rubric.requiredPoints.map((p) => [p.id, p.weight]));
+
+	let reqGot = 0;
+	for (const r of result.requiredResults) {
+		const weight = reqWeightById.get(r.id) ?? 0;
+		reqGot += weight * VERDICT_VALUE[r.met];
+	}
+	const reqScore = reqGot / reqMaxWeight;
+
+	const dqPenalty = result.disqualifierResults.filter((d) => d.triggered).length * 0.5;
+	const raw = clamp(reqScore - dqPenalty, 0, 1);
+
+	const passThreshold = rubric.scoring.passThreshold;
+	const [borderlineMin] = rubric.scoring.borderlineBand;
+
+	let verdict: ComputedScore['verdict'];
+	if (raw >= passThreshold) verdict = 'pass';
+	else if (raw < borderlineMin) verdict = 'fail';
+	else verdict = 'borderline';
+
+	return { rawScore: raw, verdict };
+}
+
+function clamp(n: number, lo: number, hi: number): number {
+	return Math.min(hi, Math.max(lo, n));
+}
