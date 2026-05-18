@@ -16,3 +16,4 @@ coverage/
 .vitest/
 drizzle/meta/
 .worktrees/
+.github/
