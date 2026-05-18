@@ -2,27 +2,35 @@ import type { PlatformClient, PrMetadata, PrCommit } from './types';
 import type { ParsedPrUrl } from './url';
 import { getKey } from '../secrets/keychain';
 
-const GL_API = 'https://gitlab.com/api/v4';
-
-let cachedToken: string | null = null;
+function envVarForHost(host: string): string {
+	const safe = host.toUpperCase().replace(/[^A-Z0-9]/g, '_');
+	return `LECTERN_GITLAB_TOKEN_${safe}`;
+}
 
 async function getGitlabToken(host: string): Promise<string | null> {
-	const account = `gitlab:${host}` as const;
-	return getKey(account);
+	const fromKeychain = await getKey(`gitlab:${host}`);
+	if (fromKeychain) return fromKeychain;
+	const fromEnv = process.env[envVarForHost(host)];
+	return fromEnv ?? null;
 }
 
 function projectPath(parsed: ParsedPrUrl): string {
 	return encodeURIComponent(`${parsed.owner}/${parsed.repo}`);
 }
 
+function apiBase(host: string): string {
+	return `https://${host}/api/v4`;
+}
+
 async function glFetch(
+	host: string,
 	path: string,
 	token: string | null,
 	signal?: AbortSignal
 ): Promise<Response> {
 	const headers: Record<string, string> = {};
 	if (token) headers['PRIVATE-TOKEN'] = token;
-	const res = await fetch(`${GL_API}${path}`, { headers, signal });
+	const res = await fetch(`${apiBase(host)}${path}`, { headers, signal });
 	if (res.status === 401 || res.status === 403) {
 		const err = new Error(`GitLab API returned ${res.status}`);
 		(err as { status?: number }).status = res.status;
@@ -36,6 +44,7 @@ export const gitlabClient: PlatformClient = {
 	async fetchMetadata(parsed, signal) {
 		const token = await getGitlabToken(parsed.host);
 		const res = await glFetch(
+			parsed.host,
 			`/projects/${projectPath(parsed)}/merge_requests/${parsed.prNumber}`,
 			token,
 			signal
@@ -71,7 +80,8 @@ export const gitlabClient: PlatformClient = {
 	async fetchDiff(parsed, signal) {
 		const token = await getGitlabToken(parsed.host);
 		const res = await glFetch(
-			`/projects/${projectPath(parsed)}/merge_requests/${parsed.prNumber}.diff`,
+			parsed.host,
+			`/projects/${projectPath(parsed)}/merge_requests/${parsed.prNumber}/raw_diffs`,
 			token,
 			signal
 		);
@@ -81,6 +91,7 @@ export const gitlabClient: PlatformClient = {
 	async fetchCommits(parsed, signal) {
 		const token = await getGitlabToken(parsed.host);
 		const res = await glFetch(
+			parsed.host,
 			`/projects/${projectPath(parsed)}/merge_requests/${parsed.prNumber}/commits`,
 			token,
 			signal
@@ -99,6 +110,7 @@ export const gitlabClient: PlatformClient = {
 		const encodedPath = encodeURIComponent(path);
 		try {
 			const res = await glFetch(
+				parsed.host,
 				`/projects/${projectPath(parsed)}/repository/files/${encodedPath}/raw?ref=${encodeURIComponent(ref)}`,
 				token,
 				signal

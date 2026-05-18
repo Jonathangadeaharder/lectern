@@ -20,6 +20,7 @@ export class IngestionAuthError extends Error {
 export interface IngestOptions {
 	signal?: AbortSignal;
 	onProgress?: (e: IngestProgressEvent) => void;
+	force?: boolean;
 }
 
 function clientFor(platform: 'github' | 'gitlab'): PlatformClient {
@@ -39,6 +40,23 @@ export async function ingestFromUrl(
 	try {
 		emit({ step: 'metadata' });
 		const meta = await client.fetchMetadata(parsed, opts.signal);
+
+		// Short-circuit: if a bundle for this exact head SHA already exists, reuse it.
+		// Avoids re-fetching the diff and the FK-restricted delete below.
+		const db = getDb();
+		const slug = repoSlug(parsed);
+		if (!opts.force) {
+			const reusable = db
+				.select()
+				.from(bundles)
+				.where(eq(bundles.repoSlug, slug))
+				.all()
+				.find((row) => row.prNumber === parsed.prNumber && row.headSha === meta.headSha);
+			if (reusable) {
+				emit({ step: 'done', bundleId: reusable.id });
+				return { id: reusable.id, filePath: reusable.filePath, sizeBytes: reusable.sizeBytes };
+			}
+		}
 
 		emit({ step: 'diff' });
 		const diff = await client.fetchDiff(parsed, opts.signal);
@@ -126,23 +144,29 @@ export async function ingestFromUrl(
 		});
 
 		const id = randomUUID();
-		const db = getDb();
 
-		// Drop any existing row for the same (repo, prNumber) — v1.0 keeps just latest.
+		// Drop stale rows for the same (repo, prNumber). Sessions reference bundles
+		// with ON DELETE restrict, so a delete may fail; keep the stale row in that
+		// case — the new bundle supersedes it for fresh sessions.
 		const existing = db
 			.select()
 			.from(bundles)
-			.where(eq(bundles.repoSlug, repoSlug(parsed)))
+			.where(eq(bundles.repoSlug, slug))
 			.all()
 			.filter((row) => row.prNumber === parsed.prNumber);
 		for (const e of existing) {
-			db.delete(bundles).where(eq(bundles.id, e.id)).run();
+			try {
+				db.delete(bundles).where(eq(bundles.id, e.id)).run();
+			} catch (err) {
+				const msg = err instanceof Error ? err.message : String(err);
+				if (!msg.includes('FOREIGN KEY')) throw err;
+			}
 		}
 
 		db.insert(bundles)
 			.values({
 				id,
-				repoSlug: repoSlug(parsed),
+				repoSlug: slug,
 				prNumber: parsed.prNumber,
 				sourceUrl: url,
 				filePath: written.filePath,

@@ -33,12 +33,14 @@
 		"db:migrate": "tsx ./src/lib/server/db/migrate.ts"
 	},
 	"dependencies": {
-		"@ai-sdk/openai-compatible": "^0.2.0",
+		"@ai-sdk/openai-compatible": "^1.0.39",
+		"@ai-sdk/provider": "^2.0.3",
 		"@ai-sdk/svelte": "^2.0.0",
 		"@octokit/rest": "^21.0.2",
 		"ai": "^5.0.52",
 		"argon2": "^0.44.0",
 		"better-sqlite3": "^11.3.0",
+		"dotenv": "^17.4.2",
 		"drizzle-orm": "^0.45.2",
 		"env-paths": "^3.0.0",
 		"execa": "^9.5.1",

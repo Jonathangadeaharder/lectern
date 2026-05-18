@@ -22,12 +22,15 @@ export interface SessionRow {
 	activeTimeMs: number;
 }
 
-export async function createSession(bundleId: string): Promise<SessionRow> {
+export async function createSession(
+	bundleId: string,
+	opts: { force?: boolean } = {}
+): Promise<SessionRow> {
 	const db = getDb();
 	const bundle = db.select().from(bundles).where(eq(bundles.id, bundleId)).get();
 	if (!bundle) throw new Error(`bundle not found: ${bundleId}`);
 
-	const chunks = await chunkBundle(bundleId);
+	const chunks = await chunkBundle(bundleId, { force: opts.force });
 	const sessionId = randomUUID();
 	const now = Date.now();
 
@@ -56,17 +59,36 @@ export async function createSession(bundleId: string): Promise<SessionRow> {
 		}
 	});
 
-	// Question generation runs OUTSIDE the create transaction (LLM calls are async + slow).
-	// Done sequentially per chunk; failures isolated per chunk.
-	for (const chunk of chunks) {
-		try {
-			await generateQuestionsForChunk({ sessionId, bundleId, chunk });
-		} catch (e) {
-			console.warn(`[session] question gen failed for chunk ${chunk.id}: ${(e as Error).message}`);
-		}
-	}
+	generating.add(sessionId);
+	void generateQuestionsBackground(sessionId, bundleId, chunks);
 
 	return loadSession(sessionId);
+}
+
+const generating = new Set<string>();
+
+export function isGenerating(sessionId: string): boolean {
+	return generating.has(sessionId);
+}
+
+async function generateQuestionsBackground(
+	sessionId: string,
+	bundleId: string,
+	chunks: Awaited<ReturnType<typeof chunkBundle>>
+): Promise<void> {
+	try {
+		for (const chunk of chunks) {
+			try {
+				await generateQuestionsForChunk({ sessionId, bundleId, chunk });
+			} catch (e) {
+				console.warn(
+					`[session] question gen failed for chunk ${chunk.id}: ${(e as Error).message}`
+				);
+			}
+		}
+	} finally {
+		generating.delete(sessionId);
+	}
 }
 
 export function loadSession(sessionId: string): SessionRow {

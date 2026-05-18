@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import { resolveDataDir } from '$lib/server/config/paths';
 import { getQuickConfig } from '$lib/server/services/llm/quick_config';
 import type { Handle } from '@sveltejs/kit';

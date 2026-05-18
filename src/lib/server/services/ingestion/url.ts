@@ -17,7 +17,7 @@ export interface ParsedPrUrl {
 
 const GITHUB_RE = /^https:\/\/github\.com\/(?<owner>[^/]+)\/(?<repo>[^/]+)\/pull\/(?<n>\d+)\/?/;
 const GITLAB_RE =
-	/^https:\/\/gitlab\.com\/(?<owner>.+?)\/(?<repo>[^/]+)\/-\/merge_requests\/(?<n>\d+)\/?/;
+	/^https:\/\/(?<host>[^/]+)\/(?<owner>.+?)\/(?<repo>[^/]+)\/-\/merge_requests\/(?<n>\d+)\/?/;
 
 export function parsePrUrl(input: string): ParsedPrUrl {
 	const url = input.trim();
@@ -32,10 +32,10 @@ export function parsePrUrl(input: string): ParsedPrUrl {
 		};
 	}
 	const gl = GITLAB_RE.exec(url);
-	if (gl?.groups?.owner && gl.groups.repo && gl.groups.n) {
+	if (gl?.groups?.host && gl.groups.owner && gl.groups.repo && gl.groups.n) {
 		return {
 			platform: 'gitlab',
-			host: 'gitlab.com',
+			host: gl.groups.host,
 			owner: gl.groups.owner,
 			repo: gl.groups.repo,
 			prNumber: Number(gl.groups.n)

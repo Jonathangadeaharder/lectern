@@ -1,6 +1,11 @@
 import { getDb } from '$lib/server/db';
-import { chunkSets, sessionQuestions, sessions } from '$lib/server/db/schema';
-import { deleteSession, describeSession, listSessionAnswers } from '$lib/server/services/session';
+import { bundles, chunkSets, sessionQuestions, sessions } from '$lib/server/db/schema';
+import {
+	deleteSession,
+	describeSession,
+	isGenerating,
+	listSessionAnswers
+} from '$lib/server/services/session';
 import { error, json } from '@sveltejs/kit';
 import { eq } from 'drizzle-orm';
 
@@ -28,11 +33,20 @@ export async function GET({ params }) {
 			status: q.status,
 			question: JSON.parse(q.promptJson)
 		}));
+		const chunksReady = new Set(qRows.map((q) => q.chunkId)).size;
+		const stillGenerating = isGenerating(id);
+		const bundle = db.select().from(bundles).where(eq(bundles.id, session.bundleId)).get();
 		return json({
 			session: summary.session,
 			chunks,
 			questions,
-			answers: listSessionAnswers(id)
+			answers: listSessionAnswers(id),
+			source: bundle ? { url: bundle.sourceUrl } : null,
+			generation: {
+				complete: !stillGenerating,
+				chunksReady,
+				chunksTotal: chunks.length
+			}
 		});
 	} catch (e) {
 		throw error(500, e instanceof Error ? e.message : String(e));
