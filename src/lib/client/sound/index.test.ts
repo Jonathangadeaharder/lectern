@@ -22,6 +22,19 @@ vi.mock('./bus.svelte', () => ({
 	_resetForTesting: vi.fn()
 }));
 
+vi.mock('./events', () => {
+	const listeners = new Set<Function>();
+	return {
+		emit: vi.fn((event: string) => {
+			for (const l of listeners) l(event);
+		}),
+		subscribe: vi.fn((listener: Function) => {
+			listeners.add(listener);
+			return () => listeners.delete(listener);
+		})
+	};
+});
+
 describe('sound API', () => {
 	let api: typeof import('./index');
 	let busConfig: { enabled: boolean; volume: number; perSoundOverrides: Record<string, unknown> };

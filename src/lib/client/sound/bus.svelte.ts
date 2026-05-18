@@ -7,6 +7,8 @@ const QUESTION_REVEAL_SUPPRESS_MS = 1000;
 
 let howlMap: Record<string, Howl> | null = null;
 let howlerLoading = false;
+let brokenSounds = new Set<string>();
+let sessionSoundDisabled = false;
 
 let lastPlayedAt = 0;
 let lastQuestionRevealAt = 0;
@@ -74,9 +76,33 @@ export async function ensureHowler(): Promise<boolean> {
 			howlMap[name] = new Howl({
 				src: [SOUND_FILES[name]],
 				volume: config.volume,
-				preload: true
+				preload: true,
+				onloaderror: () => {
+					if (!brokenSounds.has(name)) {
+						console.warn(`[sound] load error: ${name}`);
+						brokenSounds.add(name);
+					}
+				},
+				onplayerror: () => {
+					if (!brokenSounds.has(name)) {
+						console.warn(`[sound] play error: ${name}`);
+						brokenSounds.add(name);
+					}
+				}
 			});
 		}
+
+		try {
+			const howlerCtx = (window as any).Howler?.ctx;
+			if (howlerCtx && howlerCtx.state === 'suspended') {
+				await howlerCtx.resume().catch(() => {
+					sessionSoundDisabled = true;
+				});
+			}
+		} catch {
+			// AudioContext check best-effort
+		}
+
 		return true;
 	} catch {
 		return false;
@@ -108,6 +134,8 @@ export function markPlayed(name: SoundName): void {
 export function playSound(name: SoundName): void {
 	if (!config.enabled) return;
 	if (!howlMap) return;
+	if (sessionSoundDisabled) return;
+	if (brokenSounds.has(name)) return;
 
 	const override = config.perSoundOverrides[name];
 	if (override?.muted) return;
@@ -130,7 +158,9 @@ export function playSound(name: SoundName): void {
 export function setGlobalVolume(vol: number): void {
 	config.volume = Math.max(0, Math.min(1, vol));
 	if (!howlMap) return;
-	for (const howl of Object.values(howlMap)) {
+	for (const [name, howl] of Object.entries(howlMap)) {
+		const override = config.perSoundOverrides[name as SoundName];
+		if (override?.volume !== undefined) continue;
 		howl.volume(config.volume);
 	}
 }
@@ -143,6 +173,7 @@ export function resetConfig(): void {
 
 export function previewSound(name: SoundName): void {
 	if (!howlMap) return;
+	if (brokenSounds.has(name)) return;
 	const override = config.perSoundOverrides[name];
 	if (override?.muted) return;
 	const howl = howlMap[name];
@@ -158,4 +189,6 @@ export function _resetForTesting(): void {
 	lastPlayedAt = 0;
 	lastQuestionRevealAt = 0;
 	currentHowl = null;
+	brokenSounds = new Set();
+	sessionSoundDisabled = false;
 }
