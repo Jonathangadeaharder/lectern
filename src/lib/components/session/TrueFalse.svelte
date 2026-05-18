@@ -9,10 +9,11 @@
 	interface Props {
 		question: Question;
 		onsubmit: (answer: boolean) => Promise<void>;
+		onskip?: () => void;
 		graded?: { answer: boolean; verdict: string; explanation?: string };
 	}
 
-	let { question, onsubmit, graded }: Props = $props();
+	let { question, onsubmit, onskip, graded }: Props = $props();
 
 	let selected = $state<boolean | null>(null);
 	let submitting = $state(false);
@@ -81,14 +82,26 @@
 	{#if !graded}
 		<div class="flex items-center justify-between">
 			<p class="text-xs text-text-muted">Press T or F to select. Enter to submit.</p>
-			<button
-				type="button"
-				onclick={submit}
-				disabled={selected === null || submitting}
-				class="rounded-md bg-accent px-4 py-2 text-sm font-medium text-surface-0 hover:bg-accent-hover disabled:opacity-50"
-			>
-				{submitting ? 'Submitting…' : 'Submit'}
-			</button>
+			<div class="flex gap-2">
+				{#if onskip}
+					<button
+						type="button"
+						onclick={onskip}
+						disabled={submitting}
+						class="rounded-md border border-border px-4 py-2 text-sm text-text-secondary hover:bg-surface-2 disabled:opacity-50"
+					>
+						Skip
+					</button>
+				{/if}
+				<button
+					type="button"
+					onclick={submit}
+					disabled={selected === null || submitting}
+					class="rounded-md bg-accent px-4 py-2 text-sm font-medium text-surface-0 hover:bg-accent-hover disabled:opacity-50"
+				>
+					{submitting ? 'Submitting…' : 'Submit'}
+				</button>
+			</div>
 		</div>
 	{:else}
 		<p class="text-sm text-text-secondary">{graded.explanation ?? ''}</p>

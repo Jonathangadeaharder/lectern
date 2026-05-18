@@ -5,6 +5,7 @@
 	import FreeText from '$lib/components/session/FreeText.svelte';
 	import ClickLines from '$lib/components/session/ClickLines.svelte';
 	import TrueFalse from '$lib/components/session/TrueFalse.svelte';
+	import CodeFix from '$lib/components/session/CodeFix.svelte';
 	import DiffViewer from '$lib/components/session/DiffViewer.svelte';
 	import CommandPalette from '$lib/components/session/CommandPalette.svelte';
 	import { setEnabled, getEnabled } from '$lib/client/sound';
@@ -16,10 +17,10 @@
 		id: string;
 		chunkId: string;
 		position: number;
-		format: 'multiple_choice' | 'free_text' | 'click_lines' | 'true_false';
+		format: 'multiple_choice' | 'free_text' | 'click_lines' | 'true_false' | 'code_fix';
 		type: string;
 		status: 'pending' | 'shown' | 'submitted' | 'graded' | 'skipped';
-		question: any; // Question
+		question: any;
 	}
 
 	interface Answer {
@@ -28,6 +29,7 @@
 		gradingJson: string | null;
 		verdict: string | null;
 		rawScore: number | null;
+		selfConfidence?: number | null;
 	}
 
 	let session = $state({ ...data.session });
@@ -39,6 +41,9 @@
 	let paused = $state(false);
 	let paletteOpen = $state(false);
 	let currentQuestionIdx = $state(0);
+	let showHelp = $state(false);
+	let confidenceModal = $state<{ questionId: string; value: number } | null>(null);
+	let focusedPanel = $state<'sidebar' | 'question' | 'companion'>('question');
 
 	const currentChunk = $derived(chunks[currentChunkIdx]);
 	const currentQuestions = $derived(
@@ -61,7 +66,6 @@
 	let heartbeat: ReturnType<typeof setInterval> | null = null;
 
 	onMount(async () => {
-		// Auto-start the session if it's still in `created`.
 		if (session.state === 'created') await transition('start');
 		await refresh();
 
@@ -125,17 +129,6 @@
 		}
 	}
 
-	const paletteCommands = $derived([
-		{ id: 'pause', label: 'Pause session', shortcut: '⌘P', action: () => transition('pause') },
-		{ id: 'resume', label: 'Resume session', shortcut: 'Esc', action: () => transition('resume') },
-		{ id: 'end', label: 'End session', action: () => endSession() },
-		...chunks.map((c, i) => ({
-			id: `chunk-${i}`,
-			label: `Go to chunk ${i + 1}: ${c.title || `Chunk ${i + 1}`}`,
-			action: () => (currentChunkIdx = i)
-		}))
-	]);
-
 	function onKey(e: KeyboardEvent): void {
 		const target = e.target as HTMLElement;
 		const inField =
@@ -151,9 +144,38 @@
 			return;
 		}
 
-		if (e.key === 'k' && (e.metaKey || e.ctrlKey)) {
+		if (e.key === 'Escape' && paletteOpen) {
+			paletteOpen = false;
+			return;
+		}
+
+		if (e.key === 'Escape' && showHelp) {
+			showHelp = false;
+			return;
+		}
+
+		if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
 			e.preventDefault();
-			paletteOpen = true;
+			paletteOpen = !paletteOpen;
+			return;
+		}
+
+		if (e.key === '?' && !inField && !paletteOpen) {
+			e.preventDefault();
+			showHelp = !showHelp;
+			return;
+		}
+
+		if (e.key === 'Tab' && !inField && !paletteOpen && !showHelp && !confidenceModal) {
+			e.preventDefault();
+			const panels: Array<'sidebar' | 'question' | 'companion'> = [
+				'sidebar',
+				'question',
+				'companion'
+			];
+			const idx = panels.indexOf(focusedPanel);
+			const next = idx >= 0 ? (idx + 1) % panels.length : 0;
+			focusedPanel = panels[next] ?? 'question';
 			return;
 		}
 
@@ -193,7 +215,52 @@
 		}
 	}
 
+	async function submitWithConfidence(questionId: string, submitFn: () => Promise<void>): Promise<void> {
+		if (!nextUngraded) return;
+		confidenceModal = { questionId, value: 3 };
+	}
+
+	async function confirmConfidence(): Promise<void> {
+		if (!confidenceModal) return;
+		const qId = confidenceModal.questionId;
+		const conf = confidenceModal.value;
+		confidenceModal = null;
+		await recordConfidence(qId, conf);
+	}
+
+	async function recordConfidence(questionId: string, confidence: number): Promise<void> {
+		const a = answers.find((x) => x.questionId === questionId);
+		if (a) {
+			a.selfConfidence = confidence;
+		}
+		try {
+			await fetch(`/api/sessions/${sessionId}/confidence`, {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ questionId, confidence })
+			});
+		} catch {
+			// non-critical
+		}
+	}
+
 	async function submitMc(selectedOptionId: string): Promise<void> {
+		if (!nextUngraded) return;
+		await submitWithConfidence(nextUngraded.id, async () => {
+			const res = await fetch(`/api/sessions/${sessionId}/answers`, {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({
+					format: 'multiple_choice',
+					questionId: nextUngraded!.id,
+					selectedOptionId
+				})
+			});
+			if (res.ok) await refresh();
+		});
+	}
+
+	async function submitMcDirect(selectedOptionId: string): Promise<void> {
 		if (!nextUngraded) return;
 		const res = await fetch(`/api/sessions/${sessionId}/answers`, {
 			method: 'POST',
@@ -235,9 +302,37 @@
 		if (res.ok) await refresh();
 	}
 
+	async function submitCodeFix(code: string): Promise<void> {
+		if (!nextUngraded) return;
+		const res = await fetch(`/api/sessions/${sessionId}/answers`, {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({
+				format: 'code_fix',
+				questionId: nextUngraded.id,
+				code
+			})
+		});
+		if (res.ok) await refresh();
+	}
+
+	async function skipQuestion(): Promise<void> {
+		if (!nextUngraded) return;
+		const res = await fetch(`/api/sessions/${sessionId}/answers`, {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({
+				format: nextUngraded.format,
+				questionId: nextUngraded.id,
+				skipped: true
+			})
+		});
+		if (res.ok) await refresh();
+	}
+
 	type GradedShape = {
 		rawScore?: number;
-		verdict?: 'pass' | 'fail' | 'borderline' | 'review_needed';
+		verdict?: 'pass' | 'fail' | 'borderline' | 'review_needed' | 'skipped';
 		feedback?: string;
 		requiredResults?: Array<{ id: string; met: 'yes' | 'partial' | 'no'; justification: string }>;
 	};
@@ -259,7 +354,7 @@
 		const a = answers.find((x) => x.questionId === q.id);
 		const payload = a ? JSON.parse(a.gradingJson ?? '{}') : {};
 		return {
-			selectedOptionId: '', // not stored separately; UI uses verdict to render
+			selectedOptionId: '',
 			verdict: g.verdict ?? '',
 			correctOptionId: correct?.id ?? '',
 			explanation: g.feedback ?? payload.feedback ?? ''
@@ -286,6 +381,16 @@
 		});
 		await goto(`/session/${sessionId}/debrief`);
 	}
+
+	const commandList = $derived([
+		{ id: 'pause', label: 'Pause session', shortcut: '⌘P', action: () => { paused = true; transition('pause'); } },
+		{ id: 'next-chunk', label: 'Next chunk', shortcut: 'L', action: () => { currentChunkIdx = Math.min(chunks.length - 1, currentChunkIdx + 1); } },
+		{ id: 'prev-chunk', label: 'Previous chunk', shortcut: 'H', action: () => { currentChunkIdx = Math.max(0, currentChunkIdx - 1); } },
+		{ id: 'skip', label: 'Skip question', shortcut: 'S', action: skipQuestion, disabled: !nextUngraded },
+		{ id: 'end', label: 'End session', action: endSession },
+		{ id: 'help', label: 'Show keyboard shortcuts', shortcut: '?', action: () => { showHelp = true; } },
+		{ id: 'mute', label: 'Toggle sounds', shortcut: '⌘M', action: () => { setEnabled(!getEnabled()); } }
+	]);
 </script>
 
 <svelte:head>
@@ -321,9 +426,30 @@
 		</button>
 	</header>
 
-	<!-- Body: 60/40 split -->
-	<main class="grid grid-cols-[60fr_40fr] divide-x divide-border overflow-hidden">
-		<section class="overflow-auto p-3" aria-label="Diff viewer">
+	<!-- Body: 3-column layout -->
+	<main class="grid grid-cols-[240px_1fr_320px] divide-x divide-border overflow-hidden">
+		<!-- Sidebar: chunk navigation -->
+		<nav
+			class="overflow-auto p-3 {focusedPanel === 'sidebar' ? 'ring-2 ring-accent ring-inset' : ''}"
+			aria-label="Chunk navigation"
+		>
+			{#each chunks as c, i (c.id)}
+				<button
+					type="button"
+					onclick={() => (currentChunkIdx = i)}
+					class="mb-1 w-full rounded px-2 py-1.5 text-left text-sm transition
+						{i === currentChunkIdx ? 'bg-surface-2 text-text-primary font-medium' : 'text-text-secondary hover:bg-surface-2'}"
+				>
+					{c.title || `Chunk ${i + 1}`}
+				</button>
+			{/each}
+		</nav>
+
+		<!-- Center: diff viewer -->
+		<section
+			class="overflow-auto p-3 {focusedPanel === 'question' ? 'ring-2 ring-accent ring-inset' : ''}"
+			aria-label="Diff viewer"
+		>
 			{#if currentChunk}
 				<h2 class="mb-2 px-1 text-base font-medium text-text-primary">
 					{currentChunk.title || `Chunk ${currentChunkIdx + 1}`}
@@ -337,7 +463,11 @@
 			{/if}
 		</section>
 
-		<aside class="flex flex-col gap-4 overflow-auto p-4" aria-label="Companion">
+		<!-- Companion panel -->
+		<aside
+			class="flex flex-col gap-4 overflow-auto p-4 {focusedPanel === 'companion' ? 'ring-2 ring-accent ring-inset' : ''}"
+			aria-label="Companion"
+		>
 			{#if loadingQuestions}
 				<p class="text-text-muted">Loading…</p>
 			{:else if !currentChunk}
@@ -357,7 +487,8 @@
 				{#if nextUngraded.format === 'multiple_choice'}
 					<MultipleChoice
 						question={nextUngraded.question}
-						onsubmit={submitMc}
+						onsubmit={submitMcDirect}
+						onskip={skipQuestion}
 						graded={gradedMc(nextUngraded)}
 					/>
 				{:else if nextUngraded.format === 'free_text'}
@@ -365,19 +496,29 @@
 						question={nextUngraded.question}
 						{sessionId}
 						graded={gradedFor(nextUngraded.id)}
+						onskip={skipQuestion}
 					/>
 				{:else if nextUngraded.format === 'click_lines'}
 					<ClickLines
 						question={nextUngraded.question}
 						hunks={currentChunk.hunks}
 						onsubmit={submitClickLines}
+						onskip={skipQuestion}
 						graded={gradedFor(nextUngraded.id)}
 					/>
 				{:else if nextUngraded.format === 'true_false'}
 					<TrueFalse
 						question={nextUngraded.question}
 						onsubmit={submitTrueFalse}
+						onskip={skipQuestion}
 						graded={gradedTrueFalse(nextUngraded)}
+					/>
+				{:else if nextUngraded.format === 'code_fix'}
+					<CodeFix
+						question={nextUngraded.question}
+						onsubmit={submitCodeFix}
+						onskip={skipQuestion}
+						graded={gradedFor(nextUngraded.id)}
 					/>
 				{/if}
 			{:else if allChunkQsGraded}
@@ -427,6 +568,16 @@
 		<div class="flex gap-2">
 			<button
 				type="button"
+				onclick={() => (paletteOpen = true)}
+				class="rounded-md border border-border px-3 py-1.5 text-sm hover:bg-surface-2"
+			>⌘K Commands</button>
+			<button
+				type="button"
+				onclick={() => (showHelp = true)}
+				class="rounded-md border border-border px-3 py-1.5 text-sm hover:bg-surface-2"
+			>? Shortcuts</button>
+			<button
+				type="button"
 				onclick={() => transition('pause')}
 				disabled={session.state !== 'active'}
 				class="rounded-md border border-border px-3 py-1.5 text-sm hover:bg-surface-2 disabled:opacity-50"
@@ -445,8 +596,97 @@
 <CommandPalette
 	open={paletteOpen}
 	onclose={() => (paletteOpen = false)}
-	commands={paletteCommands}
+	commands={commandList}
 />
+
+{#if confidenceModal}
+	<div
+		class="fixed inset-0 z-50 flex items-center justify-center bg-surface-0/70 backdrop-blur-sm"
+		role="dialog"
+		aria-modal="true"
+		aria-label="Confidence assessment"
+	>
+		<div class="w-full max-w-sm rounded-lg border border-border bg-surface-1 p-6">
+			<h2 class="mb-4 text-lg font-medium text-text-primary">How confident are you?</h2>
+			<div class="flex flex-col gap-3">
+				<input
+					type="range"
+					min="1"
+					max="5"
+					step="1"
+					bind:value={confidenceModal.value}
+					class="w-full accent-accent"
+				/>
+				<div class="flex justify-between text-xs text-text-muted">
+					<span>1 — Guessing</span>
+					<span>3 — Unsure</span>
+					<span>5 — Certain</span>
+				</div>
+				<div class="text-center text-sm text-text-primary">
+					Your confidence: {confidenceModal.value}/5
+				</div>
+				<div class="flex gap-2 justify-end mt-2">
+					<button
+						type="button"
+						onclick={() => (confidenceModal = null)}
+						class="rounded-md border border-border px-4 py-2 text-sm text-text-secondary hover:bg-surface-2"
+					>Cancel</button>
+					<button
+						type="button"
+						onclick={confirmConfidence}
+						class="rounded-md bg-accent px-4 py-2 text-sm font-medium text-surface-0 hover:bg-accent-hover"
+					>Confirm & Submit</button>
+				</div>
+			</div>
+		</div>
+	</div>
+{/if}
+
+{#if showHelp}
+	<!-- svelte-ignore a11y_no_static_element_interactions a11y_click_events_have_key_events a11y_interactive_supports_focus -->
+	<div
+		class="fixed inset-0 z-50 flex items-center justify-center bg-surface-0/70 backdrop-blur-sm"
+		onclick={() => (showHelp = false)}
+		onkeydown={(e) => { if (e.key === 'Escape') showHelp = false; }}
+		role="dialog"
+		aria-modal="true"
+		aria-label="Keyboard shortcuts"
+		tabindex="-1"
+	>
+		<!-- svelte-ignore a11y_no_static_element_interactions a11y_click_events_have_key_events -->
+		<div class="w-full max-w-md rounded-lg border border-border bg-surface-1 p-6" onclick={(e) => e.stopPropagation()}>
+			<h2 class="mb-4 text-lg font-medium text-text-primary">Keyboard shortcuts</h2>
+			<table class="w-full text-sm">
+				<tbody>
+					{#each [
+						['⌘K', 'Command palette'],
+						['?', 'This help'],
+						['H / L', 'Previous / next chunk'],
+						['Tab', 'Cycle panel focus'],
+						['⌘P', 'Pause session'],
+						['⌘M', 'Toggle sounds'],
+						['Esc', 'Close dialog / resume'],
+						['1-9', 'Select MC option'],
+						['T / F', 'True / False'],
+						['⌘↵', 'Submit answer']
+					] as [key, desc]}
+						<tr class="border-b border-border-subtle">
+							<td class="py-2 pr-4"><kbd class="rounded bg-surface-3 px-2 py-0.5 text-xs font-mono">{key}</kbd></td>
+							<td class="py-2 text-text-secondary">{desc}</td>
+						</tr>
+					{/each}
+				</tbody>
+			</table>
+			<div class="mt-4 text-right">
+				<button
+					type="button"
+					onclick={() => (showHelp = false)}
+					class="rounded-md bg-accent px-4 py-2 text-sm font-medium text-surface-0"
+				>Close</button>
+			</div>
+		</div>
+	</div>
+{/if}
 
 {#if paused}
 	<div

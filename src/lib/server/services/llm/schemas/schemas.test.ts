@@ -73,6 +73,43 @@ describe('QuestionSchema', () => {
 		const result = QuestionSchema.safeParse(q);
 		expect(result.success).toBe(true);
 	});
+
+	it('validates code_fix question with originalCode and expectedCode', () => {
+		const q = {
+			id: 'q1',
+			chunkId: 'c1',
+			type: 'anchor',
+			format: 'code_fix',
+			prompt: 'Fix the off-by-one error in the loop boundary.',
+			contextLines: [],
+			originalCode: 'for (let i = 0; i <= arr.length; i++)',
+			expectedCode: 'for (let i = 0; i < arr.length; i++)',
+			skillTags: ['off_by_one'],
+			difficulty: 'easy',
+			derivedFrom: { source: 'diff', refs: [] }
+		};
+		const result = QuestionSchema.safeParse(q);
+		expect(result.success).toBe(true);
+	});
+});
+
+describe('QuestionFormatSchema', () => {
+	it('accepts code_fix format', () => {
+		expect(QuestionFormatSchema.safeParse('code_fix').success).toBe(true);
+	});
+
+	it('accepts all expected formats', () => {
+		const formats = ['multiple_choice', 'free_text', 'click_lines', 'true_false', 'code_fix'];
+		for (const f of formats) {
+			expect(QuestionFormatSchema.safeParse(f).success).toBe(true);
+		}
+	});
+});
+
+describe('VerdictSchema', () => {
+	it('accepts skipped verdict', () => {
+		expect(VerdictSchema.safeParse('skipped').success).toBe(true);
+	});
 });
 
 describe('QuestionListSchema', () => {

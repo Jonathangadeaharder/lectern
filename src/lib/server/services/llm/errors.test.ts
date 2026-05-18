@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
+	BudgetExceededError,
+	CircuitOpenError,
 	LlmAbortError,
 	LlmAuthError,
 	LlmNotConfiguredError,
@@ -16,6 +18,18 @@ vi.mock('ai', () => ({
 	generateObject: vi.fn(),
 	streamObject: vi.fn(),
 	generateText: vi.fn()
+}));
+
+vi.mock('../../db', () => ({
+	getDb: vi.fn(() => ({
+		select: vi.fn(() => ({
+			from: vi.fn(() => ({
+				where: vi.fn(() => ({
+					get: vi.fn(() => null)
+				}))
+			}))
+		}))
+	}))
 }));
 
 describe('LLM Errors', () => {
@@ -51,5 +65,20 @@ describe('LLM Errors', () => {
 		const err = new LlmProviderError('test', 500);
 		expect(err.httpStatus).toBe(502);
 		expect(err.upstreamStatus).toBe(500);
+	});
+
+	it('CircuitOpenError has 503 status', () => {
+		const err = new CircuitOpenError(Date.now());
+		expect(err.httpStatus).toBe(503);
+		expect(err.name).toBe('CircuitOpenError');
+		expect(err.opensAt).toBeTypeOf('number');
+	});
+
+	it('BudgetExceededError has 429 status', () => {
+		const err = new BudgetExceededError(150, 100);
+		expect(err.httpStatus).toBe(429);
+		expect(err.name).toBe('BudgetExceededError');
+		expect(err.used).toBe(150);
+		expect(err.limit).toBe(100);
 	});
 });

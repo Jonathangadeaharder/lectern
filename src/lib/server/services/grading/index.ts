@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { createHash } from 'node:crypto';
 import { eq } from 'drizzle-orm';
 import { getDb } from '../../db';
 import { answers, sessionQuestions } from '../../db/schema';
@@ -26,11 +27,15 @@ export interface FreeTextPayload {
 export interface TrueFalsePayload {
 	answer: boolean;
 }
+export interface CodeFixPayload {
+	code: string;
+}
 export type AnswerPayload =
 	| ClickLinesPayload
 	| MultipleChoicePayload
 	| FreeTextPayload
-	| TrueFalsePayload;
+	| TrueFalsePayload
+	| CodeFixPayload;
 
 export interface GradeArgs {
 	sessionId: string;
@@ -38,6 +43,47 @@ export interface GradeArgs {
 	payload: AnswerPayload;
 	signal?: AbortSignal;
 }
+
+// ── Free-text grading cache (Gap 6) ─────────────────────────────────────────
+
+interface CacheEntry {
+	result: GradingResult;
+	expiresAt: number;
+}
+
+const gradingCache = new Map<string, CacheEntry>();
+const CACHE_TTL_MS = 5 * 60 * 1000;
+
+function cacheKey(questionId: string, answer: string): string {
+	const hash = createHash('sha256')
+		.update(questionId)
+		.update(answer)
+		.digest('hex');
+	return hash;
+}
+
+function cacheGet(questionId: string, answer: string): GradingResult | null {
+	const entry = gradingCache.get(cacheKey(questionId, answer));
+	if (!entry) return null;
+	if (Date.now() > entry.expiresAt) {
+		gradingCache.delete(cacheKey(questionId, answer));
+		return null;
+	}
+	return entry.result;
+}
+
+function cachePut(questionId: string, answer: string, result: GradingResult): void {
+	gradingCache.set(cacheKey(questionId, answer), {
+		result,
+		expiresAt: Date.now() + CACHE_TTL_MS
+	});
+}
+
+export function clearGradingCache(): void {
+	gradingCache.clear();
+}
+
+// ── Grade dispatch ───────────────────────────────────────────────────────────
 
 export async function gradeAnswer(args: GradeArgs): Promise<GradingResult> {
 	const { question, rubric } = loadQuestion(args.questionId);
@@ -52,6 +98,9 @@ export async function gradeAnswer(args: GradeArgs): Promise<GradingResult> {
 			break;
 		case 'true_false':
 			final = gradeTrueFalse(question, args.payload as TrueFalsePayload);
+			break;
+		case 'code_fix':
+			final = gradeCodeFix(question, args.payload as CodeFixPayload);
 			break;
 		case 'free_text':
 			if (!rubric) throw new Error(`free_text question ${question.id} has no rubric`);
@@ -144,6 +193,9 @@ async function gradeFreeText(args: {
 	answer: string;
 	signal?: AbortSignal;
 }): Promise<GradingResult> {
+	const cached = cacheGet(args.question.id, args.answer);
+	if (cached) return cached;
+
 	const userPrompt = gradePrompt.buildUser({
 		prompt: args.question.prompt,
 		chunkDiff: '(diff omitted in v1)',
@@ -175,12 +227,94 @@ async function gradeFreeText(args: {
 	}
 
 	const computed = computeScore(args.rubric, llm);
-	return {
+	const result: GradingResult = {
 		...llm,
 		rawScore: computed.rawScore,
 		verdict: computed.verdict,
 		confidence: computed.confidence
 	};
+
+	cachePut(args.question.id, args.answer, result);
+	return result;
+}
+
+function gradeCodeFix(question: Question, payload: CodeFixPayload): GradingResult {
+	const expected = question.expectedCode ?? '';
+	const original = question.originalCode ?? '';
+	const submitted = payload.code;
+
+	const normExpected = normalizeCode(expected);
+	const normSubmitted = normalizeCode(submitted);
+
+	const isCorrect = normExpected === normSubmitted;
+	const similarity = codeSimilarity(normSubmitted, normExpected);
+
+	let verdict: GradingResult['verdict'];
+	let rawScore: number;
+	if (isCorrect) {
+		verdict = 'pass';
+		rawScore = 1;
+	} else if (similarity >= 0.8) {
+		verdict = 'borderline';
+		rawScore = similarity;
+	} else {
+		verdict = 'fail';
+		rawScore = similarity;
+	}
+
+	const diff = computeCodeDiff(normSubmitted, normExpected);
+
+	return {
+		requiredResults: [
+			{
+				id: 'cf-correctness',
+				met: isCorrect ? 'yes' : similarity >= 0.8 ? 'partial' : 'no',
+				justification: isCorrect
+					? 'Code matches expected fix.'
+					: `Similarity ${(similarity * 100).toFixed(0)}%`
+			}
+		],
+		bonusResults: [],
+		disqualifierResults: [],
+		rawScore,
+		verdict,
+		feedback: diff
+			? `Differences found:\n${diff}`
+			: 'Code matches expected fix.',
+		confidence: isCorrect ? 1.0 : similarity >= 0.8 ? 0.7 : 0.9
+	};
+}
+
+function normalizeCode(code: string): string {
+	return code
+		.replace(/\r\n/g, '\n')
+		.replace(/[ \t]+$/gm, '')
+		.replace(/\n{3,}/g, '\n\n')
+		.replace(/^\n+/, '')
+		.replace(/\n+$/, '');
+}
+
+function codeSimilarity(a: string, b: string): number {
+	if (a === b) return 1;
+	const aLines = a.split('\n');
+	const bLines = b.split('\n');
+	const bSet = new Set(bLines);
+	const common = aLines.filter((l) => bSet.has(l)).length;
+	const total = Math.max(aLines.length, bLines.length, 1);
+	return common / total;
+}
+
+function computeCodeDiff(submitted: string, expected: string): string {
+	const subLines = submitted.split('\n');
+	const expLines = expected.split('\n');
+	const expSet = new Set(expLines);
+	const subSet = new Set(subLines);
+	const missing = expLines.filter((l) => !subSet.has(l));
+	const extra = subLines.filter((l) => !expSet.has(l));
+	const parts: string[] = [];
+	if (missing.length) parts.push(`Missing: ${missing.slice(0, 5).join(' | ')}`);
+	if (extra.length) parts.push(`Extra: ${extra.slice(0, 5).join(' | ')}`);
+	return parts.join('\n');
 }
 
 function gradeMultipleChoice(question: Question, payload: MultipleChoicePayload): GradingResult {

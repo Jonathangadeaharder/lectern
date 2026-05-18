@@ -5,7 +5,8 @@ export const QuestionFormatSchema = z.enum([
 	'multiple_choice',
 	'free_text',
 	'click_lines',
-	'true_false'
+	'true_false',
+	'code_fix'
 ]);
 export const QuestionTypeSchema = z.enum(['anchor', 'implication']);
 export const DifficultySchema = z.enum(['easy', 'medium', 'hard']);
@@ -39,6 +40,8 @@ export const QuestionSchema = z.object({
 	expectedLines: z.array(ExpectedLineSchema).optional(),
 	correctAnswer: z.boolean().optional(),
 	explanation: z.string().optional(),
+	originalCode: z.string().optional(),
+	expectedCode: z.string().optional(),
 	rubric: RubricSchema.optional(),
 	skillTags: z.array(z.string()),
 	difficulty: DifficultySchema.default('medium'),
