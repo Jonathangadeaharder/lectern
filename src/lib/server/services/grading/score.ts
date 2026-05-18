@@ -8,7 +8,7 @@ const VERDICT_VALUE: Record<'yes' | 'partial' | 'no', number> = {
 
 export interface ComputedScore {
 	rawScore: number;
-	verdict: 'pass' | 'fail' | 'borderline' | 'review_needed';
+	verdict: 'pass' | 'fail' | 'borderline' | 'review_needed' | 'skipped';
 	confidence: number;
 }
 

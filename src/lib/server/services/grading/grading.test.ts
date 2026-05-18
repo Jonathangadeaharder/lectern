@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { GradingResult, Question, Rubric } from '../llm/schemas';
+import { clearGradingCache } from './index';
 
 vi.mock('../../db', () => ({
 	getDb: vi.fn(() => ({
@@ -40,6 +41,10 @@ vi.mock('../llm', () => ({
 }));
 
 describe('Grading logic', () => {
+	beforeEach(() => {
+		clearGradingCache();
+	});
+
 	it('gradeMultipleChoice returns correct result for correct answer', () => {
 		const question: Question = {
 			id: 'q1',
@@ -129,5 +134,45 @@ describe('Grading logic', () => {
 		expect(fallback.verdict).toBe('borderline');
 		expect(fallback.confidence).toBe(0.3);
 		expect(fallback.requiredResults).toHaveLength(0);
+	});
+
+	describe('CodeFix grading', () => {
+		it('normalizes code correctly', () => {
+			const normalizeCode = (code: string) =>
+				code
+					.replace(/\r\n/g, '\n')
+					.replace(/[ \t]+$/gm, '')
+					.replace(/\n{3,}/g, '\n\n')
+					.replace(/^\n+/, '')
+					.replace(/\n+$/, '');
+
+			expect(normalizeCode('foo\r\nbar\r\n')).toBe('foo\nbar');
+			expect(normalizeCode('a\n\n\nb')).toBe('a\n\nb');
+			expect(normalizeCode('  x  \n  y  ')).toBe('  x\n  y');
+		});
+
+		it('computes code similarity correctly', () => {
+			const codeSimilarity = (a: string, b: string) => {
+				if (a === b) return 1;
+				const aLines = a.split('\n');
+				const bLines = b.split('\n');
+				const bSet = new Set(bLines);
+				const common = aLines.filter((l) => bSet.has(l)).length;
+				const total = Math.max(aLines.length, bLines.length, 1);
+				return common / total;
+			};
+
+			expect(codeSimilarity('a\nb\nc', 'a\nb\nc')).toBe(1);
+			expect(codeSimilarity('a\nb\nc', 'a\nx\nc')).toBeCloseTo(0.667, 2);
+			expect(codeSimilarity('a\nb\nc', 'x\ny\nz')).toBe(0);
+		});
+
+		it('identical code after normalization passes', () => {
+			const expected = 'for (let i = 0; i < arr.length; i++)';
+			const submitted = 'for (let i = 0; i < arr.length; i++)  ';
+			const normExpected = expected.trim();
+			const normSubmitted = submitted.replace(/\s+$/gm, '').trim();
+			expect(normExpected).toBe(normSubmitted);
+		});
 	});
 });

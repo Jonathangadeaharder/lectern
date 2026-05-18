@@ -1,7 +1,12 @@
 /** Public LLM service surface. */
 import { generateObject, generateText, streamObject } from 'ai';
+import { eq } from 'drizzle-orm';
 import type { z } from 'zod';
+import { getDb } from '../../db';
+import { appSettings } from '../../db/schema';
 import {
+	BudgetExceededError,
+	CircuitOpenError,
 	LlmAbortError,
 	LlmAuthError,
 	LlmProviderError,
@@ -19,6 +24,7 @@ export interface RunStructuredOptions<T extends z.ZodTypeAny> {
 	temperature?: number;
 	signal?: AbortSignal;
 	maxRetries?: number;
+	sessionId?: string;
 }
 
 export interface StreamStructuredOptions<T extends z.ZodTypeAny> {
@@ -28,15 +34,124 @@ export interface StreamStructuredOptions<T extends z.ZodTypeAny> {
 	prompt: string;
 	temperature?: number;
 	signal?: AbortSignal;
+	sessionId?: string;
 }
 
 const DEFAULT_MAX_RETRIES = 2;
 const BASE_DELAY_MS = 1000;
 const MAX_DELAY_MS = 10000;
 
+// ── Circuit breaker ──────────────────────────────────────────────────────────
+
+const CB_THRESHOLD = 5;
+const CB_OPEN_DURATION_MS = 30_000;
+
+interface CircuitState {
+	failures: number;
+	openSince: number | null;
+}
+
+const circuits = new Map<string, CircuitState>();
+
+function circuitCheck(task: TaskName): void {
+	const st = circuits.get(task);
+	if (!st) return;
+	if (st.openSince !== null) {
+		if (Date.now() - st.openSince < CB_OPEN_DURATION_MS) {
+			throw new CircuitOpenError(st.openSince);
+		}
+		st.openSince = null;
+		st.failures = 0;
+	}
+}
+
+function circuitRecordSuccess(task: TaskName): void {
+	const st = circuits.get(task);
+	if (st) {
+		st.failures = 0;
+		st.openSince = null;
+	}
+}
+
+function circuitRecordFailure(task: TaskName, err: Error): void {
+	if (!isCircuitTripping(err)) return;
+	let st = circuits.get(task);
+	if (!st) {
+		st = { failures: 0, openSince: null };
+		circuits.set(task, st);
+	}
+	st.failures++;
+	if (st.failures >= CB_THRESHOLD) {
+		st.openSince = Date.now();
+		console.warn(`[llm] circuit OPEN for ${task} after ${st.failures} consecutive failures`);
+	}
+}
+
+function isCircuitTripping(err: Error): boolean {
+	return err instanceof LlmRateLimitError || err instanceof LlmProviderError;
+}
+
+export function resetCircuitBreaker(task: TaskName): void {
+	circuits.delete(task);
+}
+
+// ── Token budget tracking ────────────────────────────────────────────────────
+
+const tokenUsage = new Map<string, number>();
+
+const DEFAULT_TOKEN_LIMIT = 100_000;
+
+function addTokenUsage(sessionId: string | undefined, count: number): void {
+	if (!sessionId) return;
+	tokenUsage.set(sessionId, (tokenUsage.get(sessionId) ?? 0) + count);
+}
+
+export function getTokenUsage(sessionId: string): number {
+	return tokenUsage.get(sessionId) ?? 0;
+}
+
+export async function checkTokenBudget(sessionId: string, limit?: number): Promise<void> {
+	const maxTokens = limit ?? (await loadTokenLimit());
+	const used = getTokenUsage(sessionId);
+	if (used >= maxTokens) {
+		throw new BudgetExceededError(used, maxTokens);
+	}
+}
+
+async function loadTokenLimit(): Promise<number> {
+	try {
+		const db = getDb();
+		const row = db
+			.select()
+			.from(appSettings)
+			.where(eq(appSettings.key, 'token_budget_limit'))
+			.get();
+		if (row?.value) {
+			const parsed = JSON.parse(row.value);
+			if (typeof parsed === 'number' && parsed > 0) return parsed;
+		}
+	} catch {
+		// fall through to default
+	}
+	return DEFAULT_TOKEN_LIMIT;
+}
+
+export function resetTokenUsage(sessionId: string): void {
+	tokenUsage.delete(sessionId);
+}
+
+// ── Core LLM functions ──────────────────────────────────────────────────────
+
+function estimateTokens(text: string): number {
+	return Math.ceil(text.length / 4);
+}
+
 export async function runStructured<T extends z.ZodTypeAny>(
 	opts: RunStructuredOptions<T>
 ): Promise<z.infer<T>> {
+	circuitCheck(opts.task);
+	if (opts.sessionId) await checkTokenBudget(opts.sessionId);
+
 	const maxRetries = opts.maxRetries ?? DEFAULT_MAX_RETRIES;
 	let lastError: Error | undefined;
 
@@ -53,10 +168,13 @@ export async function runStructured<T extends z.ZodTypeAny>(
 				abortSignal: opts.signal
 			});
 			logCall(opts.task, Date.now() - t0, true);
+			circuitRecordSuccess(opts.task);
+			addTokenUsage(opts.sessionId, estimateTokens(opts.system + opts.prompt));
 			return result.object;
 		} catch (e) {
 			const mapped = mapError(e);
 			logCall(opts.task, Date.now() - t0, false, e);
+			circuitRecordFailure(opts.task, mapped);
 
 			if (mapped instanceof LlmAbortError || mapped instanceof LlmAuthError) {
 				throw mapped;
@@ -78,8 +196,12 @@ export async function runStructured<T extends z.ZodTypeAny>(
 }
 
 export async function streamStructured<T extends z.ZodTypeAny>(opts: StreamStructuredOptions<T>) {
+	circuitCheck(opts.task);
+	if (opts.sessionId) await checkTokenBudget(opts.sessionId);
+
 	const model = await getModel(opts.task);
 	try {
+		addTokenUsage(opts.sessionId, estimateTokens(opts.system + opts.prompt));
 		return streamObject({
 			model,
 			schema: opts.schema,
@@ -89,7 +211,9 @@ export async function streamStructured<T extends z.ZodTypeAny>(opts: StreamStruc
 			abortSignal: opts.signal
 		});
 	} catch (e) {
-		throw mapError(e);
+		const mapped = mapError(e);
+		circuitRecordFailure(opts.task, mapped);
+		throw mapped;
 	}
 }
 
@@ -101,7 +225,11 @@ export async function runText(opts: {
 	signal?: AbortSignal;
 	maxTokens?: number;
 	maxRetries?: number;
+	sessionId?: string;
 }): Promise<string> {
+	circuitCheck(opts.task);
+	if (opts.sessionId) await checkTokenBudget(opts.sessionId);
+
 	const maxRetries = opts.maxRetries ?? DEFAULT_MAX_RETRIES;
 	let lastError: Error | undefined;
 
@@ -118,10 +246,13 @@ export async function runText(opts: {
 				abortSignal: opts.signal
 			});
 			logCall(opts.task, Date.now() - t0, true);
+			circuitRecordSuccess(opts.task);
+			addTokenUsage(opts.sessionId, estimateTokens(opts.system + opts.prompt));
 			return result.text;
 		} catch (e) {
 			const mapped = mapError(e);
 			logCall(opts.task, Date.now() - t0, false, e);
+			circuitRecordFailure(opts.task, mapped);
 
 			if (mapped instanceof LlmAbortError || mapped instanceof LlmAuthError) {
 				throw mapped;
@@ -163,7 +294,6 @@ function sleep(ms: number): Promise<void> {
 
 function logCall(task: TaskName, latencyMs: number, ok: boolean, err?: unknown): void {
 	const level = ok ? 'info' : 'warn';
-	// Console log only in v1.0; `llm_calls` table deferred to v1.1.
 	const message = ok
 		? `[llm] ${task} ok ${latencyMs}ms`
 		: `[llm] ${task} fail ${latencyMs}ms ${err instanceof Error ? err.name : ''}`;

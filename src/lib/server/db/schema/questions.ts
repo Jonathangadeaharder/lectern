@@ -11,7 +11,7 @@ export const sessionQuestions = sqliteTable(
 		chunkId: text('chunk_id').notNull(),
 		position: integer('position').notNull(),
 		format: text('format', {
-			enum: ['multiple_choice', 'free_text', 'click_lines', 'true_false']
+			enum: ['multiple_choice', 'free_text', 'click_lines', 'true_false', 'code_fix']
 		}).notNull(),
 		type: text('type', { enum: ['anchor', 'implication'] }).notNull(),
 		promptJson: text('prompt_json').notNull(),
