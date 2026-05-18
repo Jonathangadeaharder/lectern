@@ -7,6 +7,7 @@
 	import TrueFalse from '$lib/components/session/TrueFalse.svelte';
 	import DiffViewer from '$lib/components/session/DiffViewer.svelte';
 	import CommandPalette from '$lib/components/session/CommandPalette.svelte';
+	import { setEnabled, getEnabled } from '$lib/client/sound';
 
 	let { data } = $props();
 	const sessionId = $derived(data.sessionId);
@@ -154,6 +155,14 @@
 			e.preventDefault();
 			paletteOpen = true;
 			return;
+		}
+
+		if (e.key === 'm' || e.key === 'M') {
+			if (e.metaKey || e.ctrlKey) {
+				e.preventDefault();
+				setEnabled(!getEnabled());
+				return;
+			}
 		}
 
 		if ((e.key === 'p' || e.key === 'P') && (e.metaKey || e.ctrlKey)) {
