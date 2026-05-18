@@ -429,75 +429,88 @@
 	<title>Session {session.id.slice(0, 8)}</title>
 </svelte:head>
 
-<div class="grid h-screen grid-rows-[48px_1fr_56px]">
+<div class="grid h-screen grid-rows-[56px_1fr_56px]">
 	<!-- Top progress strip -->
-	<header class="flex items-center gap-4 border-b border-border bg-surface-1 px-4">
-		<a href="/" class="text-sm text-text-muted hover:text-text-primary">Lectern</a>
-		<div class="flex flex-1 items-center gap-1">
+	<header class="session-top">
+		<a href="/dashboard" class="brand-link">
+			<svg width="20" height="20" viewBox="0 0 32 32" fill="none" aria-hidden="true">
+				<rect x="2" y="4" width="28" height="22" rx="4" stroke="hsl(var(--accent))" stroke-width="1.4" />
+				<path d="M9 10v11M9 21h11" stroke="hsl(var(--accent))" stroke-width="2.4" stroke-linecap="round" />
+				<circle cx="22" cy="12" r="1.5" fill="hsl(var(--accent))" />
+			</svg>
+			<span>Lectern</span>
+		</a>
+		<span class="badge badge-accent">
+			session · {sessionId.slice(0, 8)}
+		</span>
+		<div class="progress-bar">
 			{#each chunks as c, i (c.id)}
 				<button
 					type="button"
 					onclick={() => (currentChunkIdx = i)}
 					title={c.title || `Chunk ${i + 1}`}
-					class="h-2 flex-1 rounded-sm border
-						{i === currentChunkIdx ? 'border-accent bg-accent' : ''}
-						{i !== currentChunkIdx ? 'border-border-subtle bg-surface-2 hover:bg-surface-3' : ''}"
+					class="progress-pip"
+					class:active={i === currentChunkIdx}
+					class:done={i < currentChunkIdx}
 				></button>
 			{/each}
 		</div>
-		<span class="text-xs text-text-muted"
-			>chunk {currentChunkIdx + 1}/{chunks.length} · {session.state}</span
-		>
+		<span class="session-status mono">
+			{currentChunkIdx + 1}<span class="muted">/{chunks.length}</span> · {session.state}
+		</span>
 		<button
 			type="button"
 			onclick={() => (paletteOpen = true)}
-			class="rounded-md border border-border px-2 py-0.5 text-xs text-text-muted hover:bg-surface-2"
+			class="btn btn-sm btn-ghost"
 			title="Command palette (⌘K)"
 		>
-			⌘K
+			<span class="kbd">⌘</span><span class="kbd">K</span>
 		</button>
 	</header>
 
 	<!-- Body: 3-column layout -->
-	<main class="grid grid-cols-[240px_1fr_320px] divide-x divide-border overflow-hidden">
+	<main class="grid grid-cols-[240px_1fr_360px] divide-x divide-border overflow-hidden">
 		<!-- Sidebar: chunk navigation -->
 		<nav
-			class="overflow-auto p-3 {focusedPanel === 'sidebar' ? 'ring-2 ring-accent ring-inset' : ''}"
+			class="chunk-nav {focusedPanel === 'sidebar' ? 'panel-focus' : ''}"
 			aria-label="Chunk navigation"
 		>
+			<div class="chunk-nav-head eyebrow">Chunks · {chunks.length}</div>
 			{#each chunks as c, i (c.id)}
 				<button
 					type="button"
 					onclick={() => (currentChunkIdx = i)}
-					class="mb-1 w-full rounded px-2 py-1.5 text-left text-sm transition
-						{i === currentChunkIdx ? 'bg-surface-2 text-text-primary font-medium' : 'text-text-secondary hover:bg-surface-2'}"
+					class="chunk-item"
+					class:active={i === currentChunkIdx}
 				>
-					{c.title || `Chunk ${i + 1}`}
+					<span class="chunk-idx mono">{String(i + 1).padStart(2, '0')}</span>
+					<span class="chunk-title">{c.title || `Chunk ${i + 1}`}</span>
 				</button>
 			{/each}
 		</nav>
 
 		<!-- Center: diff viewer -->
 		<section
-			class="overflow-auto p-3 {focusedPanel === 'question' ? 'ring-2 ring-accent ring-inset' : ''}"
+			class="diff-pane {focusedPanel === 'question' ? 'panel-focus' : ''}"
 			aria-label="Diff viewer"
 		>
 			{#if currentChunk}
-				<h2 class="mb-2 px-1 text-base font-medium text-text-primary">
-					{currentChunk.title || `Chunk ${currentChunkIdx + 1}`}
-				</h2>
+				<div class="diff-pane-head">
+					<span class="eyebrow">Chunk {currentChunkIdx + 1}</span>
+					<h2 class="diff-pane-title">{currentChunk.title || `Chunk ${currentChunkIdx + 1}`}</h2>
+				</div>
 				{#if currentChunk.rationale}
-					<p class="mb-3 px-1 text-xs text-text-muted">{currentChunk.rationale}</p>
+					<p class="diff-pane-rationale">{currentChunk.rationale}</p>
 				{/if}
 				<DiffViewer hunks={currentChunk.hunks} />
 			{:else}
-				<p class="text-text-muted">No chunks.</p>
+				<p class="empty">No chunks.</p>
 			{/if}
 		</section>
 
 		<!-- Companion panel -->
 		<aside
-			class="flex flex-col gap-4 overflow-auto p-4 {focusedPanel === 'companion' ? 'ring-2 ring-accent ring-inset' : ''}"
+			class="companion {focusedPanel === 'companion' ? 'panel-focus' : ''}"
 			aria-label="Companion"
 		>
 			{#if loadingQuestions}
@@ -580,47 +593,46 @@
 	</main>
 
 	<!-- Bottom navigator -->
-	<footer class="flex items-center justify-between border-t border-border bg-surface-1 px-4">
-		<div class="flex gap-2">
+	<footer class="session-foot">
+		<div class="foot-group">
 			<button
 				type="button"
 				onclick={() => (currentChunkIdx = Math.max(0, currentChunkIdx - 1))}
 				disabled={currentChunkIdx === 0}
-				class="rounded-md border border-border px-3 py-1.5 text-sm hover:bg-surface-2 disabled:opacity-50"
-				>← Prev</button
-			>
+				class="btn btn-sm"
+			>← Prev</button>
 			<button
 				type="button"
 				onclick={() => (currentChunkIdx = Math.min(chunks.length - 1, currentChunkIdx + 1))}
 				disabled={currentChunkIdx === chunks.length - 1}
-				class="rounded-md border border-border px-3 py-1.5 text-sm hover:bg-surface-2 disabled:opacity-50"
-				>Next →</button
-			>
+				class="btn btn-sm"
+			>Next →</button>
+			<span class="foot-hint">
+				<span class="kbd">⏎</span> submit · <span class="kbd">→</span> next chunk
+			</span>
 		</div>
-		<div class="flex gap-2">
+		<div class="foot-group">
 			<button
 				type="button"
 				onclick={() => (paletteOpen = true)}
-				class="rounded-md border border-border px-3 py-1.5 text-sm hover:bg-surface-2"
-			>⌘K Commands</button>
+				class="btn btn-sm btn-ghost"
+			><span class="kbd">⌘</span><span class="kbd">K</span> Commands</button>
 			<button
 				type="button"
 				onclick={() => (showHelp = true)}
-				class="rounded-md border border-border px-3 py-1.5 text-sm hover:bg-surface-2"
-			>? Shortcuts</button>
+				class="btn btn-sm btn-ghost"
+			><span class="kbd">?</span> Shortcuts</button>
 			<button
 				type="button"
 				onclick={() => transition('pause')}
 				disabled={session.state !== 'active'}
-				class="rounded-md border border-border px-3 py-1.5 text-sm hover:bg-surface-2 disabled:opacity-50"
-				>Pause (⌘P)</button
-			>
+				class="btn btn-sm"
+			>Pause</button>
 			<button
 				type="button"
 				onclick={endSession}
-				class="rounded-md border border-state-error/40 px-3 py-1.5 text-sm text-state-error hover:bg-state-error-bg"
-				>End session</button
-			>
+				class="btn btn-sm btn-danger"
+			>End session</button>
 		</div>
 	</footer>
 </div>
@@ -737,3 +749,188 @@
 		</div>
 	</div>
 {/if}
+
+<style>
+	.session-top {
+		display: flex;
+		align-items: center;
+		gap: 12px;
+		padding: 0 16px;
+		border-bottom: 1px solid hsl(var(--border-subtle));
+		background: hsl(var(--surface-1));
+	}
+	.brand-link {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		color: hsl(var(--text-primary));
+		text-decoration: none;
+		font-size: 13px;
+		font-weight: 600;
+		letter-spacing: -0.01em;
+	}
+	.brand-link:hover {
+		color: hsl(var(--accent));
+	}
+	.progress-bar {
+		flex: 1;
+		display: flex;
+		align-items: center;
+		gap: 3px;
+	}
+	.progress-pip {
+		flex: 1;
+		height: 4px;
+		border-radius: 2px;
+		background: hsl(var(--surface-3));
+		border: none;
+		cursor: pointer;
+		transition: background var(--duration-base) var(--ease-out);
+	}
+	.progress-pip:hover {
+		background: hsl(var(--border-strong));
+	}
+	.progress-pip.done {
+		background: hsl(var(--accent) / 0.45);
+	}
+	.progress-pip.active {
+		background: hsl(var(--accent));
+		box-shadow: 0 0 8px hsl(var(--accent) / 0.5);
+	}
+	.session-status {
+		font-size: 11.5px;
+		color: hsl(var(--text-primary));
+	}
+	.session-status .muted {
+		color: hsl(var(--text-disabled));
+	}
+	.kbd {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		min-width: 18px;
+		height: 18px;
+		padding: 0 4px;
+		border: 1px solid hsl(var(--border-default));
+		background: hsl(var(--surface-2));
+		border-radius: 4px;
+		font-family: var(--font-mono);
+		font-size: 10px;
+		color: hsl(var(--text-secondary));
+		line-height: 1;
+		margin: 0 1px;
+	}
+
+	.chunk-nav {
+		overflow: auto;
+		padding: 12px 10px;
+		display: flex;
+		flex-direction: column;
+		gap: 2px;
+		background: hsl(var(--surface-1));
+	}
+	.chunk-nav-head {
+		padding: 6px 8px 10px;
+	}
+	.chunk-item {
+		display: flex;
+		align-items: center;
+		gap: 10px;
+		padding: 7px 10px;
+		border-radius: 6px;
+		background: transparent;
+		border: 1px solid transparent;
+		color: hsl(var(--text-secondary));
+		text-align: left;
+		cursor: pointer;
+		font-family: inherit;
+		font-size: 13px;
+		transition: all var(--duration-base) var(--ease-out);
+	}
+	.chunk-item:hover {
+		background: hsl(var(--surface-2));
+		color: hsl(var(--text-primary));
+	}
+	.chunk-item.active {
+		background: hsl(var(--surface-2));
+		border-color: hsl(var(--accent) / 0.4);
+		color: hsl(var(--text-primary));
+		font-weight: 500;
+	}
+	.chunk-idx {
+		font-size: 11px;
+		color: hsl(var(--text-disabled));
+	}
+	.chunk-item.active .chunk-idx {
+		color: hsl(var(--accent));
+	}
+	.chunk-title {
+		flex: 1;
+		min-width: 0;
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
+
+	.diff-pane {
+		overflow: auto;
+		padding: 20px 24px;
+		background: hsl(var(--surface-0));
+	}
+	.diff-pane-head {
+		display: flex;
+		align-items: baseline;
+		gap: 12px;
+		margin-bottom: 4px;
+	}
+	.diff-pane-title {
+		font-size: 18px;
+		font-weight: 500;
+		margin: 0;
+		color: hsl(var(--text-primary));
+		letter-spacing: -0.01em;
+	}
+	.diff-pane-rationale {
+		font-size: 12.5px;
+		color: hsl(var(--text-muted));
+		margin: 4px 0 16px;
+		line-height: 1.5;
+	}
+	.empty {
+		color: hsl(var(--text-muted));
+	}
+
+	.companion {
+		display: flex;
+		flex-direction: column;
+		gap: 16px;
+		overflow: auto;
+		padding: 20px;
+		background: hsl(var(--surface-1));
+	}
+
+	.panel-focus {
+		box-shadow: inset 0 0 0 2px hsl(var(--accent));
+	}
+
+	.session-foot {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 12px;
+		padding: 0 16px;
+		border-top: 1px solid hsl(var(--border-subtle));
+		background: hsl(var(--surface-1));
+	}
+	.foot-group {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+	}
+	.foot-hint {
+		font-size: 11px;
+		color: hsl(var(--text-muted));
+		font-family: var(--font-mono);
+		margin-left: 8px;
+	}
+</style>

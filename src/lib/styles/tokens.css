@@ -1,4 +1,4 @@
-/* Design tokens — SPEC-0014. Dark default, light via [data-theme='light']. */
+/* Design tokens — SPEC-0014 + design handoff vBgYYE9cAn. Dark default, light via [data-theme='light']. */
 :root,
 [data-theme="dark"] {
 	/* Surfaces (HSL channels) */
@@ -36,6 +36,7 @@
 	/* Typography */
 	--font-sans: "Geist Variable", "Inter", system-ui, -apple-system, sans-serif;
 	--font-mono: "Geist Mono Variable", "JetBrains Mono", "SF Mono", Consolas, monospace;
+	--font-display: "Geist Variable", system-ui, sans-serif;
 
 	/* Motion */
 	--duration-fast: 50ms;
@@ -44,13 +45,30 @@
 	--duration-slower: 400ms;
 	--ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
 	--ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+	--ease-emph: cubic-bezier(0.16, 1, 0.3, 1);
+
+	/* Density */
+	--density: 1;
+	--row-h: calc(28px * var(--density));
 
 	/* Layering */
 	--blur: 12px;
+	--shadow-1: 0 1px 0 hsl(220 13% 4% / 0.6), 0 1px 2px hsl(220 13% 4% / 0.4);
+	--shadow-2: 0 4px 16px hsl(220 13% 4% / 0.4), 0 1px 0 hsl(220 13% 4% / 0.6);
+	--shadow-3: 0 24px 64px hsl(220 13% 4% / 0.6), 0 8px 24px hsl(220 13% 4% / 0.5);
+
+	/* Syntax (cyan-leaning, low-saturation) */
+	--syn-keyword: 280 50% 75%;
+	--syn-fn: 195 50% 70%;
+	--syn-string: 38 60% 70%;
+	--syn-number: 18 70% 70%;
+	--syn-comment: 220 10% 45%;
+	--syn-type: 165 40% 65%;
+	--syn-punct: 220 10% 60%;
 }
 
 [data-theme="light"] {
-	--surface-0: 220 13% 98%;
+	--surface-0: 220 13% 99%;
 	--surface-1: 220 13% 96%;
 	--surface-2: 220 13% 93%;
 	--surface-3: 220 13% 89%;
@@ -64,16 +82,52 @@
 	--text-muted: 220 13% 55%;
 	--text-disabled: 220 13% 72%;
 
-	--accent: 195 50% 42%;
-	--accent-hover: 195 55% 36%;
-	--accent-muted: 195 40% 80%;
+	--accent: 195 55% 38%;
+	--accent-hover: 195 60% 30%;
+	--accent-muted: 195 40% 85%;
 
-	--state-success: 145 55% 35%;
+	--state-success: 145 55% 30%;
 	--state-success-bg: 145 55% 92%;
-	--state-warning: 38 85% 42%;
+	--state-warning: 38 85% 38%;
 	--state-warning-bg: 38 85% 92%;
 	--state-error: 358 65% 42%;
-	--state-error-bg: 358 65% 92%;
-	--state-info: 210 65% 42%;
-	--state-info-bg: 210 65% 92%;
+	--state-error-bg: 358 65% 94%;
+	--state-info: 210 65% 38%;
+	--state-info-bg: 210 65% 94%;
+
+	--shadow-1: 0 1px 0 hsl(220 13% 70% / 0.3), 0 1px 2px hsl(220 13% 70% / 0.2);
+	--shadow-2: 0 4px 16px hsl(220 13% 60% / 0.15), 0 1px 0 hsl(220 13% 80% / 0.4);
+	--shadow-3: 0 24px 64px hsl(220 13% 40% / 0.18), 0 8px 24px hsl(220 13% 40% / 0.12);
+
+	--syn-keyword: 280 50% 38%;
+	--syn-fn: 195 65% 35%;
+	--syn-string: 38 70% 38%;
+	--syn-number: 18 75% 38%;
+	--syn-comment: 220 10% 50%;
+	--syn-type: 165 50% 32%;
+	--syn-punct: 220 10% 30%;
+}
+
+/* Accent variants — switched via [data-accent] on <html> */
+[data-accent="violet"] {
+	--accent: 268 50% 65%;
+	--accent-hover: 268 55% 72%;
+	--accent-muted: 268 35% 38%;
+}
+[data-accent="amber"] {
+	--accent: 38 75% 60%;
+	--accent-hover: 38 80% 68%;
+	--accent-muted: 38 50% 38%;
+}
+[data-accent="emerald"] {
+	--accent: 158 45% 55%;
+	--accent-hover: 158 50% 62%;
+	--accent-muted: 158 35% 32%;
+}
+
+[data-density="compact"] {
+	--density: 0.85;
+}
+[data-density="spacious"] {
+	--density: 1.15;
 }
