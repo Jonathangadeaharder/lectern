@@ -8,6 +8,7 @@
 	import DiffViewer from '$lib/components/session/DiffViewer.svelte';
 	import CommandPalette from '$lib/components/session/CommandPalette.svelte';
 	import { setEnabled, getEnabled } from '$lib/client/sound';
+	import { emit } from '$lib/client/sound/events';
 
 	let { data } = $props();
 	const sessionId = $derived(data.sessionId);
@@ -57,6 +58,37 @@
 		currentChunkIdx;
 		currentQuestionIdx = 0;
 	});
+
+	$effect(() => {
+		if (nextUngraded && nextUngraded.id !== prevNextUngradedId) {
+			prevNextUngradedId = nextUngraded.id;
+			emit('question_pending');
+		}
+	});
+
+	$effect(() => {
+		if (allChunkQsGraded && !prevAllChunkQsGraded && currentQuestions.length > 0) {
+			prevAllChunkQsGraded = true;
+			emit('complete_chunk');
+		}
+		if (!allChunkQsGraded) prevAllChunkQsGraded = false;
+	});
+
+	$effect(() => {
+		for (const q of currentQuestions) {
+			const a = answers.find((x) => x.questionId === q.id);
+			if (!a?.verdict) continue;
+			const key = `__emitted_${q.id}_${a.verdict}`;
+			if (!(key in q)) {
+				(q as any)[key] = true;
+				if (a.verdict === 'pass') emit('verdict_pass');
+				else if (a.verdict === 'fail') emit('verdict_fail');
+			}
+		}
+	});
+
+	let prevNextUngradedId: string | null = null;
+	let prevAllChunkQsGraded = false;
 
 	let heartbeat: ReturnType<typeof setInterval> | null = null;
 
