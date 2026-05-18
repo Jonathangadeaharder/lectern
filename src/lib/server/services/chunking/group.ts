@@ -1,5 +1,5 @@
-import type { Chunk, Hunk } from './types';
 import { createHash } from 'node:crypto';
+import type { Chunk, Hunk } from './types';
 
 const TEST_FILE_RE = /(__tests?__|\.test\.|\.spec\.|tests?\/|_test\.\w+$|test_[\w-]+\.\w+$)/i;
 
@@ -70,7 +70,6 @@ export function groupHunksToChunks(hunks: Hunk[]): Chunk[] {
 				merged.push({ files: [fg.file, partner.file], hunks: [...fg.hunks, ...partner.hunks] });
 				consumed.add(fg.file);
 				consumed.add(partner.file);
-				continue;
 			}
 		}
 		// non-paired

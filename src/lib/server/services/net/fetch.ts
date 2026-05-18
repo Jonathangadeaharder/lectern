@@ -40,11 +40,7 @@ export function isHostAllowed(host: string): boolean {
 
 export function safeFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
 	const url =
-		typeof input === 'string'
-			? new URL(input)
-			: input instanceof URL
-				? input
-				: new URL(input.url);
+		typeof input === 'string' ? new URL(input) : input instanceof URL ? input : new URL(input.url);
 
 	if (!isHostAllowed(url.hostname)) {
 		throw new EgressViolation(url.hostname);

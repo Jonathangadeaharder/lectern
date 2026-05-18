@@ -1,7 +1,7 @@
 import { Octokit } from '@octokit/rest';
-import type { PlatformClient, PrMetadata, PrCommit } from './types';
-import type { ParsedPrUrl } from './url';
 import { getKey } from '../secrets/keychain';
+import type { PlatformClient, PrCommit, PrMetadata } from './types';
+import type { ParsedPrUrl } from './url';
 
 let cachedToken: string | null = null;
 let octokit: Octokit | null = null;
@@ -74,8 +74,7 @@ export const githubClient: PlatformClient = {
 				commits.push({
 					sha: c.sha,
 					message: c.commit.message,
-					author:
-						c.commit.author?.name ?? c.author?.login ?? 'unknown',
+					author: c.commit.author?.name ?? c.author?.login ?? 'unknown',
 					date: c.commit.author?.date ?? ''
 				});
 			}

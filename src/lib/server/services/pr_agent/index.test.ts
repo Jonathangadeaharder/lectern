@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 
 const FindingSchema = z.object({
@@ -49,7 +49,7 @@ describe('PrAgentReviewSchema', () => {
 		expect(result.success).toBe(true);
 		if (result.success) {
 			expect(result.data.findings).toHaveLength(1);
-			expect(result.data.findings[0]!.severityHint).toBe('blocker');
+			expect(result.data.findings[0]?.severityHint).toBe('blocker');
 		}
 	});
 

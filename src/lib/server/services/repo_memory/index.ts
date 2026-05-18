@@ -1,7 +1,14 @@
-import { eq } from 'drizzle-orm';
 import { randomUUID } from 'node:crypto';
+import { eq } from 'drizzle-orm';
 import { getDb } from '../../db';
-import { repoConventions, repoWeakSpots, sessionQuestions, answers, sessions, bundles } from '../../db/schema';
+import {
+	answers,
+	bundles,
+	repoConventions,
+	repoWeakSpots,
+	sessionQuestions,
+	sessions
+} from '../../db/schema';
 
 export type ConventionSource = 'claude_md' | 'cursorrules' | 'contributing' | 'readme' | 'other';
 
@@ -53,7 +60,12 @@ export function ingestConvention(params: {
 			.where(eq(repoConventions.id, existing.id))
 			.run();
 
-		return { ...existing, rawContent: params.content, summary: params.summary ?? null, updatedAt: now };
+		return {
+			...existing,
+			rawContent: params.content,
+			summary: params.summary ?? null,
+			updatedAt: now
+		};
 	}
 
 	const row: RepoConventionRow = {
@@ -90,11 +102,7 @@ export function updateWeakSpots(repoSlug: string): WeakSpotRow[] {
 		.from(sessions)
 		.all()
 		.filter((s) => {
-			const bundle = db
-				.select()
-				.from(bundles)
-				.where(eq(bundles.id, s.bundleId))
-				.get();
+			const bundle = db.select().from(bundles).where(eq(bundles.id, s.bundleId)).get();
 			return bundle && bundle.repoSlug === repoSlug;
 		});
 
@@ -107,11 +115,7 @@ export function updateWeakSpots(repoSlug: string): WeakSpotRow[] {
 			.where(eq(sessionQuestions.sessionId, session.id))
 			.all();
 
-		const aRows = db
-			.select()
-			.from(answers)
-			.where(eq(answers.sessionId, session.id))
-			.all();
+		const aRows = db.select().from(answers).where(eq(answers.sessionId, session.id)).all();
 
 		const answerByQId = new Map(aRows.map((a) => [a.questionId, a]));
 
@@ -140,9 +144,7 @@ export function updateWeakSpots(repoSlug: string): WeakSpotRow[] {
 		const existing = db
 			.select()
 			.from(repoWeakSpots)
-			.where(
-				eq(repoWeakSpots.tag, tag)
-			)
+			.where(eq(repoWeakSpots.tag, tag))
 			.all()
 			.find((w) => w.repoSlug === repoSlug);
 

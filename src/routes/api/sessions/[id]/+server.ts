@@ -1,8 +1,8 @@
-import { json, error } from '@sveltejs/kit';
-import { eq } from 'drizzle-orm';
-import { describeSession, deleteSession, listSessionAnswers } from '$lib/server/services/session';
 import { getDb } from '$lib/server/db';
-import { sessionQuestions, chunkSets, sessions } from '$lib/server/db/schema';
+import { chunkSets, sessionQuestions, sessions } from '$lib/server/db/schema';
+import { deleteSession, describeSession, listSessionAnswers } from '$lib/server/services/session';
+import { error, json } from '@sveltejs/kit';
+import { eq } from 'drizzle-orm';
 
 export async function GET({ params }) {
 	const id = params.id;
@@ -12,11 +12,7 @@ export async function GET({ params }) {
 		const db = getDb();
 		const session = db.select().from(sessions).where(eq(sessions.id, id)).get();
 		if (!session) throw error(404, 'session not found');
-		const cs = db
-			.select()
-			.from(chunkSets)
-			.where(eq(chunkSets.bundleId, session.bundleId))
-			.get();
+		const cs = db.select().from(chunkSets).where(eq(chunkSets.bundleId, session.bundleId)).get();
 		const chunks = cs ? JSON.parse(cs.chunksJson) : [];
 		const qRows = db
 			.select()

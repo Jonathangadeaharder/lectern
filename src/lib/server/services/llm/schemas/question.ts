@@ -1,7 +1,12 @@
 import { z } from 'zod';
 import { RubricSchema } from './rubric';
 
-export const QuestionFormatSchema = z.enum(['multiple_choice', 'free_text', 'click_lines', 'true_false']);
+export const QuestionFormatSchema = z.enum([
+	'multiple_choice',
+	'free_text',
+	'click_lines',
+	'true_false'
+]);
 export const QuestionTypeSchema = z.enum(['anchor', 'implication']);
 export const DifficultySchema = z.enum(['easy', 'medium', 'hard']);
 

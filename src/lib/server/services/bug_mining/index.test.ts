@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest';
-import { isBugFixMessage, isRefactorMessage, classifyCommit } from './index';
+import { describe, expect, it } from 'vitest';
+import { classifyCommit, isBugFixMessage, isRefactorMessage } from './index';
 
 describe('isBugFixMessage', () => {
 	it('detects "fix" prefix', () => {

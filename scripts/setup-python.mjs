@@ -7,8 +7,8 @@
  */
 import { execSync, spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync } from 'node:fs';
-import { join, resolve } from 'node:path';
 import { homedir } from 'node:os';
+import { join, resolve } from 'node:path';
 
 const dataDir = process.env.LECTERN_DATA_DIR ?? join(homedir(), '.lectern');
 const venvDir = join(dataDir, 'python-venv');
@@ -38,14 +38,18 @@ function main() {
 
 	mkdirSync(dataDir, { recursive: true, mode: 0o700 });
 
-	if (!existsSync(join(venvDir, 'bin', 'python')) && !existsSync(join(venvDir, 'Scripts', 'python.exe'))) {
+	if (
+		!existsSync(join(venvDir, 'bin', 'python')) &&
+		!existsSync(join(venvDir, 'Scripts', 'python.exe'))
+	) {
 		console.log(`[setup-python] creating venv at ${venvDir}`);
 		execSync(`${py} -m venv "${venvDir}"`, { stdio: 'inherit' });
 	}
 
-	const pip = process.platform === 'win32'
-		? join(venvDir, 'Scripts', 'pip.exe')
-		: join(venvDir, 'bin', 'pip');
+	const pip =
+		process.platform === 'win32'
+			? join(venvDir, 'Scripts', 'pip.exe')
+			: join(venvDir, 'bin', 'pip');
 
 	console.log('[setup-python] installing requirements (this can take a minute)…');
 	execSync(`"${pip}" install --upgrade pip`, { stdio: 'inherit' });

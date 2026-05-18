@@ -1,7 +1,7 @@
-import { json, error } from '@sveltejs/kit';
-import { z } from 'zod';
 import { transition } from '$lib/server/services/session';
 import { IllegalSessionTransition } from '$lib/server/services/session/machine';
+import { error, json } from '@sveltejs/kit';
+import { z } from 'zod';
 
 const BodySchema = z.discriminatedUnion('kind', [
 	z.object({ kind: z.literal('start') }),

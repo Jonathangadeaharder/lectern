@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { parsePatchToHunks } from './diff';
 
 const SIMPLE_PATCH = `diff --git a/src/index.ts b/src/index.ts
@@ -72,7 +72,7 @@ describe('parsePatchToHunks', () => {
 	it('parses a simple single-file patch', () => {
 		const hunks = parsePatchToHunks(SIMPLE_PATCH);
 		expect(hunks.length).toBeGreaterThanOrEqual(1);
-		const first = hunks[0]!;
+		const first = hunks[0] as (typeof hunks)[number];
 		expect(first.file).toBe('src/index.ts');
 		expect(first.addedLines).toBe(2);
 		expect(first.removedLines).toBe(0);
@@ -94,7 +94,7 @@ describe('parsePatchToHunks', () => {
 	it('detects added files', () => {
 		const hunks = parsePatchToHunks(NEW_FILE_PATCH);
 		expect(hunks.length).toBe(1);
-		const first = hunks[0]!;
+		const first = hunks[0] as (typeof hunks)[number];
 		expect(first.changeType).toBe('add');
 		expect(first.addedLines).toBe(3);
 		expect(first.file).toBe('src/new.ts');
@@ -109,7 +109,7 @@ describe('parsePatchToHunks', () => {
 	it('detects renamed files', () => {
 		const hunks = parsePatchToHunks(RENAME_PATCH);
 		expect(hunks.length).toBe(1);
-		const first = hunks[0]!;
+		const first = hunks[0] as (typeof hunks)[number];
 		expect(first.changeType).toBe('rename');
 		expect(first.renamedFrom).toBe('src/old-name.ts');
 		expect(first.file).toBe('src/new-name.ts');
@@ -121,7 +121,7 @@ describe('parsePatchToHunks', () => {
 
 	it('parses diff lines with correct types', () => {
 		const hunks = parsePatchToHunks(SIMPLE_PATCH);
-		const hunk = hunks[0]!;
+		const hunk = hunks[0] as (typeof hunks)[number];
 		const addedLines = hunk.lines.filter((l) => l.type === 'add');
 		const contextLines = hunk.lines.filter((l) => l.type === 'context');
 		expect(addedLines.length).toBe(2);

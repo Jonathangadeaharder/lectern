@@ -1,6 +1,6 @@
-import { sqliteTable, text, integer, real, index } from 'drizzle-orm/sqlite-core';
-import { sessions } from './sessions';
+import { index, integer, real, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 import { sessionQuestions } from './questions';
+import { sessions } from './sessions';
 
 export const answers = sqliteTable(
 	'answers',

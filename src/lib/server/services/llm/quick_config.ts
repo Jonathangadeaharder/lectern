@@ -1,6 +1,6 @@
 import { z } from 'zod';
-import { getSetting, setSetting } from '../settings/app_settings';
 import { permitHost } from '../net/fetch';
+import { getSetting, setSetting } from '../settings/app_settings';
 
 export const QuickConfigSchema = z.object({
 	endpoint: z.string().url(),

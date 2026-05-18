@@ -1,5 +1,5 @@
-import { eq } from 'drizzle-orm';
 import { randomUUID } from 'node:crypto';
+import { eq } from 'drizzle-orm';
 import { getDb } from '../../db';
 import { bugCommits, bugPatterns } from '../../db/schema';
 import type { ConventionSource } from '../repo_memory';
@@ -89,11 +89,7 @@ export function ingestCommit(params: {
 	const now = Date.now();
 	const { isBugFix, isRefactor } = classifyCommit(params.message);
 
-	const existing = db
-		.select()
-		.from(bugCommits)
-		.where(eq(bugCommits.sha, params.sha))
-		.get();
+	const existing = db.select().from(bugCommits).where(eq(bugCommits.sha, params.sha)).get();
 
 	if (existing) return existing as BugCommitRow;
 
@@ -133,10 +129,7 @@ export function szzTraceBack(params: {
 	for (const file of files) {
 		const blameSha = params.getBlame(params.bugFixSha, file);
 		if (blameSha && blameSha !== params.bugFixSha) {
-			db.update(bugCommits)
-				.set({ blameSha })
-				.where(eq(bugCommits.sha, params.bugFixSha))
-				.run();
+			db.update(bugCommits).set({ blameSha }).where(eq(bugCommits.sha, params.bugFixSha)).run();
 			return blameSha;
 		}
 	}

@@ -1,6 +1,13 @@
 import { eq } from 'drizzle-orm';
 import { getDb } from '../../db';
-import { sessions, sessionChunks, sessionQuestions, answers, debriefs, chunkSets } from '../../db/schema';
+import {
+	answers,
+	chunkSets,
+	debriefs,
+	sessionChunks,
+	sessionQuestions,
+	sessions
+} from '../../db/schema';
 import type { Question } from '../llm/schemas';
 
 const VERDICT_VALUE: Record<string, number> = {
@@ -78,7 +85,7 @@ export function generateDebrief(sessionId: string): DebriefData {
 		const verdicts = answered
 			.map((q) => answerByQId.get(q.id))
 			.filter(Boolean)
-			.map((a) => VERDICT_VALUE[a!.verdict ?? 'fail'] ?? 0);
+			.map((a) => VERDICT_VALUE[a?.verdict ?? 'fail'] ?? 0);
 		const score = verdicts.length > 0 ? verdicts.reduce((s, n) => s + n, 0) / verdicts.length : 0;
 		return {
 			chunkId: sc.chunkId,
@@ -134,13 +141,11 @@ export function generateDebrief(sessionId: string): DebriefData {
 		.sort((a, b) => b.missCount - a.missCount);
 
 	const followUps: string[] = [];
-	if (confidenceScore < 50)
-		followUps.push('Re-review the entire PR with the author present.');
+	if (confidenceScore < 50) followUps.push('Re-review the entire PR with the author present.');
 	for (const c of perChunk) if (c.score < 0.4) followUps.push(`Re-review chunk: ${c.title}.`);
 	if (aRows.some((a) => a.verdict === 'borderline'))
 		followUps.push('Ask the author about the answers you got partial credit on.');
-	if (followUps.length === 0)
-		followUps.push('Run the test suite locally before approving.');
+	if (followUps.length === 0) followUps.push('Run the test suite locally before approving.');
 
 	const debrief: DebriefData = {
 		sessionId,

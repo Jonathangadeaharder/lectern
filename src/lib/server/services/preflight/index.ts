@@ -1,15 +1,15 @@
-import { and, eq } from 'drizzle-orm';
 import { randomUUID } from 'node:crypto';
+import { and, eq } from 'drizzle-orm';
 import { getDb } from '../../db';
 import { bundles, preflightOverrides, preflightResults } from '../../db/schema';
 import {
-	isPrAgentAvailable,
 	PrAgentCrashError,
 	PrAgentParseError,
+	type PrAgentReview,
 	PrAgentSetupError,
 	PrAgentTimeoutError,
-	runReview,
-	type PrAgentReview
+	isPrAgentAvailable,
+	runReview
 } from '../pr_agent';
 
 const TIERS: Record<'blocker' | 'major' | 'minor', readonly string[]> = {
@@ -70,10 +70,7 @@ export async function runPreflight(
 			.select()
 			.from(preflightResults)
 			.where(
-				and(
-					eq(preflightResults.bundleId, bundleId),
-					eq(preflightResults.headSha, bundle.headSha)
-				)
+				and(eq(preflightResults.bundleId, bundleId), eq(preflightResults.headSha, bundle.headSha))
 			)
 			.get();
 		if (cached) {
@@ -136,8 +133,7 @@ export async function runPreflight(
 		counts[tier] += 1;
 	}
 
-	const decision: Decision =
-		counts.blocker > 0 ? 'block' : counts.major > 0 ? 'warn' : 'proceed';
+	const decision: Decision = counts.blocker > 0 ? 'block' : counts.major > 0 ? 'warn' : 'proceed';
 
 	return persistAndReturn({
 		bundleId,

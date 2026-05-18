@@ -1,6 +1,6 @@
 import { runStructured } from '../llm';
-import { ChunkTitleListSchema } from '../llm/schemas';
 import * as prompt from '../llm/prompts/chunk_titles';
+import { ChunkTitleListSchema } from '../llm/schemas';
 import type { Chunk } from './types';
 
 const SAMPLE_DIFF_LIMIT = 1024;

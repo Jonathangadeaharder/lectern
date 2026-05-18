@@ -1,7 +1,7 @@
+import { createWriteStream } from 'node:fs';
 import { mkdir, rm, stat, writeFile } from 'node:fs/promises';
 import { dirname, isAbsolute, join, normalize, sep } from 'node:path';
 import { pipeline } from 'node:stream/promises';
-import { createWriteStream } from 'node:fs';
 import * as tar from 'tar';
 import { resolveDataDir } from '../../config/paths';
 import type { BundleManifest } from './types';

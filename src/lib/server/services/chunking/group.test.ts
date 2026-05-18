@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest';
-import { groupHunksToChunks, isTestFile, stripTestSuffix, estimateMinutes } from './group';
+import { describe, expect, it } from 'vitest';
+import { estimateMinutes, groupHunksToChunks, isTestFile, stripTestSuffix } from './group';
 import type { Hunk } from './types';
 
 function makeHunk(overrides: Partial<Hunk> = {}): Hunk {
@@ -90,7 +90,7 @@ describe('groupHunksToChunks', () => {
 		const hunks = [makeHunk({ file: 'src/foo.ts', addedLines: 5, removedLines: 2 })];
 		const chunks = groupHunksToChunks(hunks);
 		expect(chunks).toHaveLength(1);
-		expect(chunks[0]!.primaryFiles).toContain('src/foo.ts');
+		expect(chunks[0]?.primaryFiles).toContain('src/foo.ts');
 	});
 
 	it('pairs test file with implementation file', () => {
@@ -99,8 +99,8 @@ describe('groupHunksToChunks', () => {
 		const chunks = groupHunksToChunks([implHunk, testHunk]);
 		// Should be merged into one chunk
 		expect(chunks).toHaveLength(1);
-		expect(chunks[0]!.primaryFiles).toContain('src/parser.ts');
-		expect(chunks[0]!.primaryFiles).toContain('src/parser.test.ts');
+		expect(chunks[0]?.primaryFiles).toContain('src/parser.ts');
+		expect(chunks[0]?.primaryFiles).toContain('src/parser.test.ts');
 	});
 
 	it('keeps unrelated files separate', () => {
@@ -133,19 +133,25 @@ describe('groupHunksToChunks', () => {
 	it('tags test-only chunks as test', () => {
 		const testHunk = makeHunk({ file: 'src/foo.test.ts', addedLines: 3 });
 		const chunks = groupHunksToChunks([testHunk]);
-		expect(chunks[0]!.tags).toContain('test');
+		expect(chunks[0]?.tags).toContain('test');
 	});
 
 	it('tags impl chunks as impl', () => {
 		const implHunk = makeHunk({ file: 'src/foo.ts', addedLines: 3 });
 		const chunks = groupHunksToChunks([implHunk]);
-		expect(chunks[0]!.tags).toContain('impl');
+		expect(chunks[0]?.tags).toContain('impl');
 	});
 
 	it('splits large groups into smaller chunks', () => {
 		// Create multiple hunks that together exceed 15 minutes
 		const hunks = Array.from({ length: 20 }, (_, i) =>
-			makeHunk({ file: 'src/big.ts', addedLines: 30, removedLines: 10, oldStart: i * 30, newStart: i * 30 })
+			makeHunk({
+				file: 'src/big.ts',
+				addedLines: 30,
+				removedLines: 10,
+				oldStart: i * 30,
+				newStart: i * 30
+			})
 		);
 		const chunks = groupHunksToChunks(hunks);
 		expect(chunks.length).toBeGreaterThanOrEqual(2);
@@ -154,6 +160,6 @@ describe('groupHunksToChunks', () => {
 	it('estimates minutes per chunk', () => {
 		const hunks = [makeHunk({ file: 'src/a.ts', addedLines: 10, removedLines: 5 })];
 		const chunks = groupHunksToChunks(hunks);
-		expect(chunks[0]!.estimatedMinutes).toBeGreaterThan(0);
+		expect(chunks[0]?.estimatedMinutes).toBeGreaterThan(0);
 	});
 });

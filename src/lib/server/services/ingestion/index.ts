@@ -1,13 +1,13 @@
+import { randomUUID } from 'node:crypto';
 import { eq } from 'drizzle-orm';
 import parseDiff from 'parse-diff';
-import { randomUUID } from 'node:crypto';
 import { getDb } from '../../db';
 import { bundles } from '../../db/schema';
 import { isBinary } from './binary';
-import { writeBundle, bundlePath as bundleFilePath } from './bundle';
+import { bundlePath as bundleFilePath, writeBundle } from './bundle';
 import { githubClient } from './github';
 import type { BundleFileEntry, BundleManifest, IngestProgressEvent, PlatformClient } from './types';
-import { parsePrUrl, repoSlug, type ParsedPrUrl } from './url';
+import { type ParsedPrUrl, parsePrUrl, repoSlug } from './url';
 
 export class IngestionAuthError extends Error {
 	constructor(public readonly platform: 'github' | 'gitlab') {
@@ -23,10 +23,13 @@ export interface IngestOptions {
 
 function clientFor(platform: 'github' | 'gitlab'): PlatformClient {
 	if (platform === 'github') return githubClient;
-	throw new Error(`gitlab.com client deferred to v1.1`);
+	throw new Error('gitlab.com client deferred to v1.1');
 }
 
-export async function ingestFromUrl(url: string, opts: IngestOptions = {}): Promise<{ id: string; filePath: string; sizeBytes: number }> {
+export async function ingestFromUrl(
+	url: string,
+	opts: IngestOptions = {}
+): Promise<{ id: string; filePath: string; sizeBytes: number }> {
 	const parsed = parsePrUrl(url);
 	const client = clientFor(parsed.platform);
 	const emit = opts.onProgress ?? (() => undefined);
@@ -57,15 +60,17 @@ export async function ingestFromUrl(url: string, opts: IngestOptions = {}): Prom
 			const baseRef = meta.baseSha;
 			const headRef = meta.headSha;
 
-			const baseFile = f.from && f.from !== '/dev/null'
-				? await client.fetchFile(parsed, f.from, baseRef, opts.signal)
-				: null;
+			const baseFile =
+				f.from && f.from !== '/dev/null'
+					? await client.fetchFile(parsed, f.from, baseRef, opts.signal)
+					: null;
 			filesDone += 1;
 			emit({ step: 'files', filesDone, filesTotal: totalFiles });
 
-			const headFile = f.to && f.to !== '/dev/null'
-				? await client.fetchFile(parsed, f.to, headRef, opts.signal)
-				: null;
+			const headFile =
+				f.to && f.to !== '/dev/null'
+					? await client.fetchFile(parsed, f.to, headRef, opts.signal)
+					: null;
 			filesDone += 1;
 			emit({ step: 'files', filesDone, filesTotal: totalFiles });
 

@@ -1,8 +1,8 @@
-import { json, error } from '@sveltejs/kit';
 import {
 	TestConnectionRequestSchema,
 	testConnection
 } from '$lib/server/services/llm/test_connection';
+import { error, json } from '@sveltejs/kit';
 
 export async function POST({ request }) {
 	const body = await request.json().catch(() => null);

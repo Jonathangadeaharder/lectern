@@ -1,10 +1,10 @@
-import { and, eq } from 'drizzle-orm';
 import { randomUUID } from 'node:crypto';
+import { and, eq } from 'drizzle-orm';
 import { getDb } from '../../db';
-import { sessions, sessionChunks, sessionQuestions, answers, bundles } from '../../db/schema';
+import { answers, bundles, sessionChunks, sessionQuestions, sessions } from '../../db/schema';
 import { chunkBundle } from '../chunking';
 import { generateQuestionsForChunk } from '../questions';
-import { nextState, type SessionEvent, type SessionState } from './machine';
+import { type SessionEvent, type SessionState, nextState } from './machine';
 
 export interface SessionRow {
 	id: string;
@@ -44,7 +44,7 @@ export async function createSession(bundleId: string): Promise<SessionRow> {
 			.run();
 
 		for (let i = 0; i < chunks.length; i++) {
-			const c = chunks[i]!;
+			const c = chunks[i] as (typeof chunks)[number];
 			tx.insert(sessionChunks)
 				.values({
 					sessionId,
@@ -62,9 +62,7 @@ export async function createSession(bundleId: string): Promise<SessionRow> {
 		try {
 			await generateQuestionsForChunk({ sessionId, bundleId, chunk });
 		} catch (e) {
-			console.warn(
-				`[session] question gen failed for chunk ${chunk.id}: ${(e as Error).message}`
-			);
+			console.warn(`[session] question gen failed for chunk ${chunk.id}: ${(e as Error).message}`);
 		}
 	}
 
@@ -126,10 +124,7 @@ export function transition(sessionId: string, event: SessionEvent): SessionRow {
 
 export function recordHeartbeat(sessionId: string): void {
 	const db = getDb();
-	db.update(sessions)
-		.set({ lastActivityAt: Date.now() })
-		.where(eq(sessions.id, sessionId))
-		.run();
+	db.update(sessions).set({ lastActivityAt: Date.now() }).where(eq(sessions.id, sessionId)).run();
 }
 
 export function deleteSession(sessionId: string): void {
@@ -158,7 +153,10 @@ export function crashRecovery(): void {
 export interface SessionSummary {
 	session: SessionRow;
 	chunks: Array<{ chunkId: string; position: number; status: string }>;
-	questionsByChunk: Map<string, Array<{ id: string; format: string; type: string; status: string }>>;
+	questionsByChunk: Map<
+		string,
+		Array<{ id: string; format: string; type: string; status: string }>
+	>;
 }
 
 export function describeSession(sessionId: string): SessionSummary {
@@ -177,7 +175,10 @@ export function describeSession(sessionId: string): SessionSummary {
 		.where(eq(sessionQuestions.sessionId, sessionId))
 		.all();
 
-	const questionsByChunk = new Map<string, Array<{ id: string; format: string; type: string; status: string }>>();
+	const questionsByChunk = new Map<
+		string,
+		Array<{ id: string; format: string; type: string; status: string }>
+	>();
 	for (const q of qRows) {
 		const list = questionsByChunk.get(q.chunkId) ?? [];
 		list.push({ id: q.id, format: q.format, type: q.type, status: q.status });

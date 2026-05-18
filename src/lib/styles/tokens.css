@@ -1,6 +1,6 @@
-/* Design tokens — SPEC-0014. Dark-only for v1.0. */
+/* Design tokens — SPEC-0014. Dark default, light via [data-theme='light']. */
 :root,
-[data-theme='dark'] {
+[data-theme="dark"] {
 	/* Surfaces (HSL channels) */
 	--surface-0: 220 13% 9%;
 	--surface-1: 220 13% 12%;
@@ -34,8 +34,8 @@
 	--state-info-bg: 210 65% 18%;
 
 	/* Typography */
-	--font-sans: 'Geist Variable', 'Inter', system-ui, -apple-system, sans-serif;
-	--font-mono: 'Geist Mono Variable', 'JetBrains Mono', 'SF Mono', Consolas, monospace;
+	--font-sans: "Geist Variable", "Inter", system-ui, -apple-system, sans-serif;
+	--font-mono: "Geist Mono Variable", "JetBrains Mono", "SF Mono", Consolas, monospace;
 
 	/* Motion */
 	--duration-fast: 50ms;
@@ -47,4 +47,33 @@
 
 	/* Layering */
 	--blur: 12px;
+}
+
+[data-theme="light"] {
+	--surface-0: 220 13% 98%;
+	--surface-1: 220 13% 96%;
+	--surface-2: 220 13% 93%;
+	--surface-3: 220 13% 89%;
+
+	--border-subtle: 220 13% 89%;
+	--border-default: 220 13% 82%;
+	--border-strong: 220 13% 70%;
+
+	--text-primary: 220 13% 10%;
+	--text-secondary: 220 13% 35%;
+	--text-muted: 220 13% 55%;
+	--text-disabled: 220 13% 72%;
+
+	--accent: 195 50% 42%;
+	--accent-hover: 195 55% 36%;
+	--accent-muted: 195 40% 80%;
+
+	--state-success: 145 55% 35%;
+	--state-success-bg: 145 55% 92%;
+	--state-warning: 38 85% 42%;
+	--state-warning-bg: 38 85% 92%;
+	--state-error: 358 65% 42%;
+	--state-error-bg: 358 65% 92%;
+	--state-info: 210 65% 42%;
+	--state-info-bg: 210 65% 92%;
 }

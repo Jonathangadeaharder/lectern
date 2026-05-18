@@ -1,5 +1,5 @@
-import { json, error } from '@sveltejs/kit';
 import { chunkBundle } from '$lib/server/services/chunking';
+import { error, json } from '@sveltejs/kit';
 
 export async function GET({ params, request }) {
 	const bundleId = params.bundleId;

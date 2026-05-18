@@ -1,4 +1,4 @@
-import { sqliteTable, text, integer, real, index } from 'drizzle-orm/sqlite-core';
+import { index, integer, real, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 
 export const sessionActivity = sqliteTable(
 	'session_activity',
@@ -20,14 +20,11 @@ export const sessionActivity = sqliteTable(
 	})
 );
 
-export const repoCompetence = sqliteTable(
-	'repo_competence',
-	{
-		repoSlug: text('repo_slug').primaryKey(),
-		totalSessions: integer('total_sessions').notNull().default(0),
-		totalQuestions: integer('total_questions').notNull().default(0),
-		avgScore: real('avg_score'),
-		lastSessionAt: integer('last_session_at'),
-		updatedAt: integer('updated_at').notNull()
-	}
-);
+export const repoCompetence = sqliteTable('repo_competence', {
+	repoSlug: text('repo_slug').primaryKey(),
+	totalSessions: integer('total_sessions').notNull().default(0),
+	totalQuestions: integer('total_questions').notNull().default(0),
+	avgScore: real('avg_score'),
+	lastSessionAt: integer('last_session_at'),
+	updatedAt: integer('updated_at').notNull()
+});
