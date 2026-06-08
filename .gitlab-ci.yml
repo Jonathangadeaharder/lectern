@@ -1,6 +1,13 @@
 stages:
   - pr_agent
 
+# PR-Agent runs on merge-request events. Provider, model, and tokens are
+# supplied via GitLab CI/CD variables — never hardcoded here. Required:
+#   PR_AGENT_MODEL                 e.g. "openai/gpt-4o" or "anthropic/claude-sonnet-4-5"
+#   PR_AGENT_FALLBACK_MODELS       JSON array, e.g. '["openai/gpt-4o-mini"]'
+#   PR_AGENT_CUSTOM_MAX_TOKENS     e.g. "128000"
+#   GITLAB_PERSONAL_ACCESS_TOKEN   PAT with api scope
+#   OPENAI_KEY, OPENAI_API_BASE    LLM credentials (named OPENAI for LiteLLM)
 pr_agent_job:
   stage: pr_agent
   tags:
@@ -10,9 +17,9 @@ pr_agent_job:
     entrypoint: [""]
   variables:
     CONFIG__GIT_PROVIDER: "gitlab"
-    CONFIG__MODEL: "openai/cgm-eu"
-    CONFIG__CUSTOM_MODEL_MAX_TOKENS: "128000"
-    CONFIG__FALLBACK_MODELS: '["openai/cgm-eu"]'
+    CONFIG__MODEL: "$PR_AGENT_MODEL"
+    CONFIG__CUSTOM_MODEL_MAX_TOKENS: "$PR_AGENT_CUSTOM_MAX_TOKENS"
+    CONFIG__FALLBACK_MODELS: "$PR_AGENT_FALLBACK_MODELS"
     LITELLM__DROP_PARAMS: "True"
     PR_REVIEWER__EXTRA_INSTRUCTIONS: "This is a SvelteKit + TypeScript project using Drizzle ORM with SQLite. Prefer idiomatic Svelte 5 runes syntax. The Python subdir uses Ruff. Review for security: never expose API keys or .env contents."
   script:

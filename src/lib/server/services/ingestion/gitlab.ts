@@ -2,7 +2,7 @@ import type { PlatformClient, PrMetadata, PrCommit } from './types';
 import type { ParsedPrUrl } from './url';
 import { getKey } from '../secrets/keychain';
 
-function envVarForHost(host: string): string {
+export function envVarForGitlabHost(host: string): string {
 	const safe = host.toUpperCase().replace(/[^A-Z0-9]/g, '_');
 	return `LECTERN_GITLAB_TOKEN_${safe}`;
 }
@@ -10,7 +10,7 @@ function envVarForHost(host: string): string {
 async function getGitlabToken(host: string): Promise<string | null> {
 	const fromKeychain = await getKey(`gitlab:${host}`);
 	if (fromKeychain) return fromKeychain;
-	const fromEnv = process.env[envVarForHost(host)];
+	const fromEnv = process.env[envVarForGitlabHost(host)];
 	return fromEnv ?? null;
 }
 
@@ -33,7 +33,9 @@ async function glFetch(
 	const res = await fetch(`${apiBase(host)}${path}`, { headers, signal });
 	if (res.status === 401 || res.status === 403) {
 		const err = new Error(`GitLab API returned ${res.status}`);
-		(err as { status?: number }).status = res.status;
+		(err as { status?: number; tokenPresent?: boolean; host?: string }).status = res.status;
+		(err as { tokenPresent?: boolean }).tokenPresent = Boolean(token);
+		(err as { host?: string }).host = host;
 		throw err;
 	}
 	if (!res.ok) throw new Error(`GitLab API error: ${res.status} ${await res.text()}`);

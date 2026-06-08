@@ -6,7 +6,7 @@ import type { ParsedPrUrl } from './url';
 let cachedToken: string | null = null;
 let octokit: Octokit | null = null;
 
-async function getOctokit(): Promise<Octokit> {
+async function getOctokit(): Promise<{ gh: Octokit; tokenPresent: boolean }> {
 	const token = await getKey('github');
 	if (!octokit || token !== cachedToken) {
 		cachedToken = token;
@@ -16,18 +16,30 @@ async function getOctokit(): Promise<Octokit> {
 			request: { fetch: globalThis.fetch }
 		});
 	}
-	return octokit;
+	return { gh: octokit, tokenPresent: Boolean(token) };
+}
+
+function tagAuthError(e: unknown, tokenPresent: boolean): unknown {
+	const status = (e as { status?: number }).status;
+	if (status === 401 || status === 403) {
+		(e as { tokenPresent?: boolean }).tokenPresent = tokenPresent;
+	}
+	return e;
 }
 
 export const githubClient: PlatformClient = {
 	async fetchMetadata(parsed, signal) {
-		const gh = await getOctokit();
-		const { data } = await gh.rest.pulls.get({
-			owner: parsed.owner,
-			repo: parsed.repo,
-			pull_number: parsed.prNumber,
-			request: { signal }
-		});
+		const { gh, tokenPresent } = await getOctokit();
+		const { data } = await gh.rest.pulls
+			.get({
+				owner: parsed.owner,
+				repo: parsed.repo,
+				pull_number: parsed.prNumber,
+				request: { signal }
+			})
+			.catch((e) => {
+				throw tagAuthError(e, tokenPresent);
+			});
 		const state: PrMetadata['state'] = data.draft
 			? 'draft'
 			: data.merged
@@ -48,19 +60,23 @@ export const githubClient: PlatformClient = {
 	},
 
 	async fetchDiff(parsed, signal) {
-		const gh = await getOctokit();
-		const res = await gh.request('GET /repos/{owner}/{repo}/pulls/{pull_number}', {
-			owner: parsed.owner,
-			repo: parsed.repo,
-			pull_number: parsed.prNumber,
-			mediaType: { format: 'diff' },
-			request: { signal }
-		});
+		const { gh, tokenPresent } = await getOctokit();
+		const res = await gh
+			.request('GET /repos/{owner}/{repo}/pulls/{pull_number}', {
+				owner: parsed.owner,
+				repo: parsed.repo,
+				pull_number: parsed.prNumber,
+				mediaType: { format: 'diff' },
+				request: { signal }
+			})
+			.catch((e) => {
+				throw tagAuthError(e, tokenPresent);
+			});
 		return res.data as unknown as string;
 	},
 
 	async fetchCommits(parsed, signal) {
-		const gh = await getOctokit();
+		const { gh } = await getOctokit();
 		const commits: PrCommit[] = [];
 		const iterator = gh.paginate.iterator(gh.rest.pulls.listCommits, {
 			owner: parsed.owner,
@@ -83,7 +99,7 @@ export const githubClient: PlatformClient = {
 	},
 
 	async fetchFile(parsed, path, ref, signal) {
-		const gh = await getOctokit();
+		const { gh, tokenPresent } = await getOctokit();
 		try {
 			const res = await gh.rest.repos.getContent({
 				owner: parsed.owner,
@@ -100,7 +116,7 @@ export const githubClient: PlatformClient = {
 		} catch (e) {
 			const status = (e as { status?: number }).status;
 			if (status === 404) return null;
-			throw e;
+			throw tagAuthError(e, tokenPresent);
 		}
 	}
 };

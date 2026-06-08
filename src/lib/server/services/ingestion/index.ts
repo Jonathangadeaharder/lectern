@@ -6,13 +6,37 @@ import { bundles } from '../../db/schema';
 import { isBinary } from './binary';
 import { bundlePath as bundleFilePath, writeBundle } from './bundle';
 import { githubClient } from './github';
-import { gitlabClient } from './gitlab';
+import { envVarForGitlabHost, gitlabClient } from './gitlab';
 import type { BundleFileEntry, BundleManifest, IngestProgressEvent, PlatformClient } from './types';
 import { type ParsedPrUrl, parsePrUrl, repoSlug } from './url';
 
+function buildAuthMessage(
+	platform: 'github' | 'gitlab',
+	host: string,
+	tokenPresent: boolean,
+	status: number | undefined
+): string {
+	if (platform === 'gitlab') {
+		const envVar = envVarForGitlabHost(host);
+		if (!tokenPresent) {
+			return `No token found for ${host}. Add one in Settings, or set ${envVar} in your environment (or .env). GitLab returned ${status ?? 401}.`;
+		}
+		return `${host} rejected the token (HTTP ${status ?? 401}). It's expired, revoked, or missing 'read_api' scope. Replace it in Settings or update ${envVar}.`;
+	}
+	if (!tokenPresent) {
+		return `No GitHub token found. Add one in Settings to ingest private repos or avoid rate limits. GitHub returned ${status ?? 401}.`;
+	}
+	return `GitHub rejected the token (HTTP ${status ?? 401}). It's expired, revoked, or missing 'repo' scope. Replace it in Settings.`;
+}
+
 export class IngestionAuthError extends Error {
-	constructor(public readonly platform: 'github' | 'gitlab') {
-		super(`Authentication required. Add a source token in Settings.`);
+	constructor(
+		public readonly platform: 'github' | 'gitlab',
+		public readonly host: string,
+		public readonly tokenPresent: boolean,
+		public readonly status?: number
+	) {
+		super(buildAuthMessage(platform, host, tokenPresent, status));
 		this.name = 'IngestionAuthError';
 	}
 }
@@ -183,8 +207,10 @@ export async function ingestFromUrl(
 	} catch (e) {
 		const status = (e as { status?: number }).status;
 		if (status === 401 || status === 403) {
-			emit({ step: 'error', kind: 'auth', message: 'Authentication required. Add a source token in Settings.' });
-			throw new IngestionAuthError(parsed.platform);
+			const tokenPresent = (e as { tokenPresent?: boolean }).tokenPresent ?? false;
+			const authErr = new IngestionAuthError(parsed.platform, parsed.host, tokenPresent, status);
+			emit({ step: 'error', kind: 'auth', message: authErr.message });
+			throw authErr;
 		}
 		emit({
 			step: 'error',

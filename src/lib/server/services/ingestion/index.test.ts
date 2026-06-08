@@ -96,9 +96,24 @@ describe('ingestFromUrl', () => {
 	});
 
 	it('IngestionAuthError contains platform info', () => {
-		const err = new IngestionAuthError('github');
+		const err = new IngestionAuthError('github', 'github.com', false, 401);
 		expect(err.platform).toBe('github');
+		expect(err.host).toBe('github.com');
+		expect(err.tokenPresent).toBe(false);
+		expect(err.status).toBe(401);
 		expect(err.message).toContain('Settings');
 		expect(err.name).toBe('IngestionAuthError');
+	});
+
+	it('gitlab message names the host and env var when token is missing', () => {
+		const err = new IngestionAuthError('gitlab', 'git.example.corp', false, 401);
+		expect(err.message).toContain('git.example.corp');
+		expect(err.message).toContain('LECTERN_GITLAB_TOKEN_GIT_EXAMPLE_CORP');
+	});
+
+	it('gitlab message distinguishes a rejected token from a missing one', () => {
+		const err = new IngestionAuthError('gitlab', 'git.example.corp', true, 401);
+		expect(err.message).toContain('rejected');
+		expect(err.message).toContain('read_api');
 	});
 });

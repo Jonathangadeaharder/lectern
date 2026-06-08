@@ -17,3 +17,9 @@ coverage/
 drizzle/meta/
 .worktrees/
 .github/
+
+# Local dev data (per-machine SQLite, etc.)
+.lectern-dev/
+
+# GitLab Runner state — registered per host, never to be committed
+.runner_system_id
