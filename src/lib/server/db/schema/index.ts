@@ -14,3 +14,4 @@ export * from './session_activity';
 export * from './repo_scan_state';
 export * from './bookmarks';
 export * from './llm_cache';
+export * from './presentations';

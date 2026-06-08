@@ -8,4 +8,5 @@ export type TaskName =
 	| 'cumulative_summary'
 	| 'bug_pattern_extraction'
 	| 'ask_about_selection'
-	| 'summarize_convention';
+	| 'summarize_convention'
+	| 'generate_presentation';

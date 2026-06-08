@@ -43,6 +43,24 @@ through page actions or the service layer.
 ## Known gaps
 
 - The mechanical and LLM modes are both implemented; the choice is made
-  in `generator.ts` but is not user-controllable from the viewer.
+  in `ensurePresentation()` via `mode: 'auto' | 'llm' | 'mechanical'`
+  but is not user-controllable from the viewer UI.
 - Coverage warnings (`uncoveredBySlide`) are computed but not exposed as
   a "regenerate these slides" affordance — they're informational only.
+- Four side-panel components have **no unit tests**:
+  `ChangesetsPanel.svelte`, `SystematicPatterns.svelte`,
+  `CausalClaims.svelte`, `GraphView.svelte`. Service modules
+  `generator.ts`, `llm-generate.ts`, and `storage.ts` are also
+  untested at the unit level (the verifier and the two simpler
+  components are tested).
+- [`GraphView.svelte`](../../src/lib/components/presentation/GraphView.svelte)
+  `getHopDistance` returns `1` for direct edges and `2` for everything
+  else — it is **not** a real BFS. Distances beyond one hop are
+  approximate. Only affects the Graph tab's node colouring.
+- [`SystematicPatterns.svelte`](../../src/lib/components/presentation/SystematicPatterns.svelte)
+  renders `representativeInstance` as a `<pre>` block, not the
+  before/after diff pane the integration plan described.
+- The Playwright e2e at `tests/e2e/presentation.spec.ts` is
+  `test.skip`ped: it needs a fixture seed that ingests a small public
+  PR and waits for LLM generation. Only the home-page screenshot
+  (`tests/e2e/home.spec.ts`) currently runs.

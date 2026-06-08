@@ -9,6 +9,7 @@ export interface DataDirLayout {
 	exports: string;
 	logs: string;
 	pythonVenv: string;
+	presentations: string;
 }
 
 let cached: DataDirLayout | null = null;
@@ -25,7 +26,8 @@ export function resolveDataDir(): DataDirLayout {
 		bundles: join(root, 'bundles'),
 		exports: join(root, 'exports'),
 		logs: join(root, 'logs'),
-		pythonVenv: join(root, 'python-venv')
+		pythonVenv: join(root, 'python-venv'),
+		presentations: join(root, 'presentations')
 	};
 
 	ensureDirs(layout);
@@ -34,7 +36,14 @@ export function resolveDataDir(): DataDirLayout {
 }
 
 function ensureDirs(layout: DataDirLayout): void {
-	for (const path of [layout.root, layout.db, layout.bundles, layout.exports, layout.logs]) {
+	for (const path of [
+		layout.root,
+		layout.db,
+		layout.bundles,
+		layout.exports,
+		layout.logs,
+		layout.presentations
+	]) {
 		if (!existsSync(path)) {
 			mkdirSync(path, { recursive: true, mode: 0o700 });
 		} else {

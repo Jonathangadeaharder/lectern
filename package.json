@@ -19,6 +19,7 @@
 		"typecheck": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
 		"lint": "biome check .",
 		"lint:sounds": "node scripts/check-sound-size.mjs",
+		"lint:presentation": "python agents/investigations/reports/2026-06-05_disconnect_retry_briefing/verify_coverage.py agents/investigations/reports/2026-06-05_disconnect_retry_briefing/slides.md agents/investigations/reports/2026-06-05_disconnect_retry_briefing/scope.diff --strict-over",
 		"format": "biome format --write .",
 		"test": "vitest run",
 		"test:watch": "vitest",
