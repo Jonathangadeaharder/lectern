@@ -6,7 +6,6 @@ import {
 } from '$lib/server/services/llm/quick_config';
 import { hasKey, setKey } from '$lib/server/services/secrets/keychain';
 import { error, json } from '@sveltejs/kit';
-import type { RequestEvent } from '@sveltejs/kit';
 import { z } from 'zod';
 
 export async function GET() {
@@ -27,7 +26,7 @@ const PutBodySchema = QuickConfigSchema.extend({
 	token: z.string().min(1)
 });
 
-export async function PUT({ request }: RequestEvent) {
+export async function PUT({ request }) {
 	const body = await request.json().catch(() => null);
 	const parsed = PutBodySchema.safeParse(body);
 	if (!parsed.success) {

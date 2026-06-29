@@ -1,7 +1,6 @@
 import { IngestionAuthError, ingestFromUrl } from '$lib/server/services/ingestion';
 import { createSession } from '$lib/server/services/session';
 import { error, json, redirect } from '@sveltejs/kit';
-import type { RequestEvent } from '@sveltejs/kit';
 import { z } from 'zod';
 
 const BodySchema = z.object({
@@ -9,7 +8,7 @@ const BodySchema = z.object({
 	force: z.boolean().optional()
 });
 
-export async function POST({ request }: RequestEvent) {
+export async function POST({ request }) {
 	const ct = request.headers.get('content-type') ?? '';
 	let url: string | undefined;
 	let force = false;

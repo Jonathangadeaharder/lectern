@@ -1,12 +1,14 @@
 <script lang="ts">
-	import { onMount, tick } from 'svelte';
+	import { onMount } from 'svelte';
+	import { goto } from '$app/navigation';
 	import Icon from '$lib/client/Icon.svelte';
 	import LecternMark from '$lib/client/LecternMark.svelte';
 
 	let configured = $state(false);
 	let loading = $state(true);
 	let prUrl = $state('');
-	let formEl: HTMLFormElement | null = $state(null);
+	let submitting = $state(false);
+	let submitError = $state<string | null>(null);
 
 	const samples = [
 		{
@@ -26,10 +28,40 @@
 		}
 	];
 
-	async function trySample(url: string) {
+	function trySample(url: string) {
 		prUrl = url;
-		await tick();
-		formEl?.requestSubmit();
+		setTimeout(() => submit());
+	}
+
+	async function submit() {
+		if (!prUrl.trim() || submitting) return;
+		submitting = true;
+		submitError = null;
+		try {
+			const res = await fetch('/api/sessions/create', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ url: prUrl.trim() })
+			});
+			if (!res.ok) {
+				const text = await res.text();
+				try {
+					const parsed = JSON.parse(text);
+					submitError = parsed.message ?? `Error ${res.status}`;
+				} catch {
+					submitError = `Error ${res.status}: ${text.slice(0, 200)}`;
+				}
+				return;
+			}
+			const body = await res.json();
+			if (body.sessionId) {
+				await goto(`/session/${body.sessionId}`);
+			}
+		} catch (e) {
+			submitError = (e as Error).message;
+		} finally {
+			submitting = false;
+		}
 	}
 
 	onMount(async () => {
@@ -76,19 +108,26 @@
 			</a>
 		</div>
 	{:else}
-		<form bind:this={formEl} method="POST" action="/api/sessions/create" class="pr-input">
+		<form onsubmit={(e) => { e.preventDefault(); submit(); }} class="pr-input">
 			<Icon name="pull-request" size={16} color="hsl(var(--text-muted))" />
 			<input
 				type="url"
-				name="url"
 				bind:value={prUrl}
 				placeholder="https://github.com/drizzle-team/drizzle-orm/pull/2913"
 				aria-label="Pull request URL"
+				disabled={submitting}
 			/>
-			<button type="submit" class="btn btn-primary">
-				Ingest <Icon name="arrow-right" size={13} />
+			<button type="submit" class="btn btn-primary" disabled={submitting || !prUrl.trim()}>
+				{submitting ? 'Loading…' : 'Ingest'}
+				{#if !submitting}
+					<Icon name="arrow-right" size={13} />
+				{/if}
 			</button>
 		</form>
+
+		{#if submitError}
+			<p class="submit-error" role="alert">{submitError}</p>
+		{/if}
 
 		<div class="samples">
 			<span class="muted small">or try</span>
@@ -243,5 +282,11 @@
 		display: flex;
 		align-items: center;
 		gap: 6px;
+	}
+	.submit-error {
+		margin-top: 12px;
+		font-size: 13px;
+		color: hsl(0 70% 60%);
+		max-width: 540px;
 	}
 </style>

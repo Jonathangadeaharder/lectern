@@ -1,14 +1,14 @@
+import { randomUUID } from 'node:crypto';
 import { eq } from 'drizzle-orm';
 import parseDiff from 'parse-diff';
-import { randomUUID } from 'node:crypto';
 import { getDb } from '../../db';
 import { bundles } from '../../db/schema';
 import { isBinary } from './binary';
-import { writeBundle, bundlePath as bundleFilePath } from './bundle';
+import { bundlePath as bundleFilePath, writeBundle } from './bundle';
 import { githubClient } from './github';
 import { gitlabClient } from './gitlab';
 import type { BundleFileEntry, BundleManifest, IngestProgressEvent, PlatformClient } from './types';
-import { parsePrUrl, repoSlug, type ParsedPrUrl } from './url';
+import { type ParsedPrUrl, parsePrUrl, repoSlug } from './url';
 
 export class IngestionAuthError extends Error {
 	constructor(public readonly platform: 'github' | 'gitlab') {
@@ -183,11 +183,7 @@ export async function ingestFromUrl(
 	} catch (e) {
 		const status = (e as { status?: number }).status;
 		if (status === 401 || status === 403) {
-			emit({
-				step: 'error',
-				kind: 'auth',
-				message: 'Authentication required. Add a source token in Settings.'
-			});
+			emit({ step: 'error', kind: 'auth', message: 'Authentication required. Add a source token in Settings.' });
 			throw new IngestionAuthError(parsed.platform);
 		}
 		emit({

@@ -1,9 +1,10 @@
 /** Public LLM service surface. */
-import { generateObject, generateText, streamObject } from 'ai';
+import { createHash } from 'node:crypto';
+import { generateObject, generateText, NoObjectGeneratedError, streamObject } from 'ai';
 import { eq } from 'drizzle-orm';
 import type { z } from 'zod';
 import { getDb } from '../../db';
-import { appSettings } from '../../db/schema';
+import { appSettings, llmCache } from '../../db/schema';
 import {
 	BudgetExceededError,
 	CircuitOpenError,
@@ -95,6 +96,16 @@ export function resetCircuitBreaker(task: TaskName): void {
 	circuits.delete(task);
 }
 
+export function clearCacheForTask(task: TaskName): void {
+	try {
+		const db = getDb();
+		db.delete(llmCache).where(eq(llmCache.task, task)).run();
+		console.log(`[llm] cleared cache for task: ${task}`);
+	} catch {
+		// non-fatal
+	}
+}
+
 // ── Token budget tracking ────────────────────────────────────────────────────
 
 const tokenUsage = new Map<string, number>();
@@ -146,11 +157,31 @@ function estimateTokens(text: string): number {
 	return Math.ceil(text.length / 4);
 }
 
+function cacheKey(task: TaskName, system: string, prompt: string, mode: 'text' | 'structured' = 'structured'): string {
+	const raw = `${mode}:${task}\n${system}\n${prompt}`;
+	return createHash('sha256').update(raw).digest('hex');
+}
+
+function cacheGet(hash: string): string | null {
+	return null;
+}
+
+function cachePut(hash: string, task: TaskName, responseJson: string, modelId: string | null, latencyMs: number): void {
+	return;
+}
+
 export async function runStructured<T extends z.ZodTypeAny>(
 	opts: RunStructuredOptions<T>
 ): Promise<z.infer<T>> {
 	circuitCheck(opts.task);
 	if (opts.sessionId) await checkTokenBudget(opts.sessionId);
+
+	const key = cacheKey(opts.task, opts.system, opts.prompt, 'structured');
+	const cached = cacheGet(key);
+	if (cached !== null) {
+		console.log(`[llm] ${opts.task} cache hit`);
+		return JSON.parse(cached) as z.infer<T>;
+	}
 
 	const maxRetries = opts.maxRetries ?? DEFAULT_MAX_RETRIES;
 	let lastError: Error | undefined;
@@ -162,14 +193,18 @@ export async function runStructured<T extends z.ZodTypeAny>(
 			const result = await generateObject({
 				model,
 				schema: opts.schema,
+				mode: 'tool',
 				system: opts.system,
 				prompt: opts.prompt,
 				temperature: opts.temperature ?? 0,
 				abortSignal: opts.signal
 			});
-			logCall(opts.task, Date.now() - t0, true);
+			const latency = Date.now() - t0;
+			logCall(opts.task, latency, true);
 			circuitRecordSuccess(opts.task);
 			addTokenUsage(opts.sessionId, estimateTokens(opts.system + opts.prompt));
+			const json = JSON.stringify(result.object);
+			cachePut(key, opts.task, json, model.modelId, latency);
 			return result.object;
 		} catch (e) {
 			const mapped = mapError(e);
@@ -230,6 +265,13 @@ export async function runText(opts: {
 	circuitCheck(opts.task);
 	if (opts.sessionId) await checkTokenBudget(opts.sessionId);
 
+	const key = cacheKey(opts.task, opts.system, opts.prompt, 'text');
+	const cached = cacheGet(key);
+	if (cached !== null) {
+		console.log(`[llm] ${opts.task} cache hit`);
+		return JSON.parse(cached) as string;
+	}
+
 	const maxRetries = opts.maxRetries ?? DEFAULT_MAX_RETRIES;
 	let lastError: Error | undefined;
 
@@ -245,9 +287,11 @@ export async function runText(opts: {
 				maxOutputTokens: opts.maxTokens,
 				abortSignal: opts.signal
 			});
-			logCall(opts.task, Date.now() - t0, true);
+			const latency = Date.now() - t0;
+			logCall(opts.task, latency, true);
 			circuitRecordSuccess(opts.task);
 			addTokenUsage(opts.sessionId, estimateTokens(opts.system + opts.prompt));
+			cachePut(key, opts.task, JSON.stringify(result.text), model.modelId, latency);
 			return result.text;
 		} catch (e) {
 			const mapped = mapError(e);
@@ -294,19 +338,44 @@ function sleep(ms: number): Promise<void> {
 
 function logCall(task: TaskName, latencyMs: number, ok: boolean, err?: unknown): void {
 	const level = ok ? 'info' : 'warn';
+	let detail = '';
+	if (!ok && err instanceof Error) {
+		detail = err.name;
+		if (NoObjectGeneratedError.isInstance(err)) {
+			const raw = (err as NoObjectGeneratedError).text ?? '';
+			detail += ` finishReason=${(err as NoObjectGeneratedError).finishReason ?? 'unknown'}`;
+			if (raw) detail += ` raw=${raw.slice(0, 500)}`;
+		}
+	}
 	const message = ok
 		? `[llm] ${task} ok ${latencyMs}ms`
-		: `[llm] ${task} fail ${latencyMs}ms ${err instanceof Error ? err.name : ''}`;
+		: `[llm] ${task} fail ${latencyMs}ms ${detail}`;
 	if (level === 'info') console.log(message);
 	else console.warn(message);
 }
 
 function mapError(e: unknown): Error {
+	if (NoObjectGeneratedError.isInstance(e)) {
+		const noe = e as NoObjectGeneratedError;
+		const raw = noe.text ?? '';
+		const reason = noe.finishReason ?? 'unknown';
+		return new LlmSchemaError(
+			`NoObjectGenerated (finishReason=${reason}): ${raw.slice(0, 800)}`
+		);
+	}
 	if (e instanceof Error) {
 		const name = e.name.toLowerCase();
 		const message = e.message.toLowerCase();
 		if (name === 'aborterror' || message.includes('aborted')) return new LlmAbortError();
-		if (message.includes('zoderror') || name.includes('zod')) return new LlmSchemaError(e.message);
+		if (
+			message.includes('zoderror') ||
+			name.includes('zod') ||
+			message.includes('no object generated') ||
+			message.includes('could not parse') ||
+			message.includes('failed to parse')
+		) {
+			return new LlmSchemaError(e.message);
+		}
 		if (message.includes('401') || message.includes('403') || message.includes('unauthor')) {
 			return new LlmAuthError(e.message);
 		}

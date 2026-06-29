@@ -353,9 +353,15 @@
 							<span class="mono small">
 								{s.confidenceScore !== null ? `${s.confidenceScore}%` : '—'}
 							</span>
-							<a class="btn btn-sm btn-ghost" href={`/session/${s.sessionId}/debrief`}>
-								Debrief <Icon name="arrow-right" size={12} />
-							</a>
+							{#if s.state === 'completed'}
+								<a class="btn btn-sm btn-ghost" href={`/session/${s.sessionId}/debrief`}>
+									Debrief <Icon name="arrow-right" size={12} />
+								</a>
+							{:else}
+								<a class="btn btn-sm" href={`/session/${s.sessionId}`}>
+									Resume <Icon name="arrow-right" size={12} />
+								</a>
+							{/if}
 						</div>
 					</div>
 				{/each}

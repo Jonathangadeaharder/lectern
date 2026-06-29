@@ -16,7 +16,7 @@ describe('intensity', () => {
 		[5, 10, 3],
 		[7, 10, 3],
 		[8, 10, 4],
-		[10, 10, 4]
+		[10, 10, 4],
 	])('intensity(%i,%i) === %i', (c, m, e) => {
 		expect(intensity(c, m)).toBe(e);
 	});
@@ -41,8 +41,8 @@ describe('averageScore', () => {
 		expect(averageScore([{ avgScore: null }])).toBeNull();
 	});
 	it('averages only non-null scores', () => {
-		expect(averageScore([{ avgScore: 0.5 }, { avgScore: null }, { avgScore: 1.0 }])).toBeCloseTo(
-			0.75
-		);
+		expect(
+			averageScore([{ avgScore: 0.5 }, { avgScore: null }, { avgScore: 1.0 }])
+		).toBeCloseTo(0.75);
 	});
 });

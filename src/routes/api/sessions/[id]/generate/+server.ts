@@ -3,7 +3,6 @@ import { chunkSets, sessionQuestions, sessions } from '$lib/server/db/schema';
 import type { Chunk } from '$lib/server/services/chunking';
 import { generateQuestionsForChunk } from '$lib/server/services/questions';
 import { error, json } from '@sveltejs/kit';
-import type { RequestEvent } from '@sveltejs/kit';
 import { eq } from 'drizzle-orm';
 import { z } from 'zod';
 
@@ -12,7 +11,7 @@ const BodySchema = z.object({
 	weakTags: z.array(z.string()).optional()
 });
 
-export async function POST({ params, request }: RequestEvent) {
+export async function POST({ params, request }) {
 	const sessionId = params.id;
 	if (!sessionId) throw error(400, 'missing session id');
 
@@ -84,7 +83,7 @@ export async function POST({ params, request }: RequestEvent) {
 	});
 }
 
-export async function GET({ params }: RequestEvent) {
+export async function GET({ params }) {
 	const sessionId = params.id;
 	if (!sessionId) throw error(400, 'missing session id');
 
@@ -96,15 +95,19 @@ export async function GET({ params }: RequestEvent) {
 		.all();
 
 	return json({
-		questions: rows.map((r) => ({
-			id: r.id,
-			chunkId: r.chunkId,
-			position: r.position,
-			format: r.format,
-			type: r.type,
-			status: r.status,
-			difficulty: r.difficulty,
-			question: JSON.parse(r.promptJson)
-		}))
+		questions: rows.map((r) => {
+			const parsed = JSON.parse(r.promptJson);
+			parsed.id = r.id;
+			return {
+				id: r.id,
+				chunkId: r.chunkId,
+				position: r.position,
+				format: r.format,
+				type: r.type,
+				status: r.status,
+				difficulty: r.difficulty,
+				question: parsed
+			};
+		})
 	});
 }

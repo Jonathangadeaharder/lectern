@@ -21,6 +21,22 @@ Rules:
 - prompt: 1-3 sentences, no emoji, no flattery.
 - Output JSON matching the schema EXACTLY.`;
 
+export const CROSS_CHUNK_SYSTEM = `You generate a cross-chunk comprehension question for a guided code-review session.
+
+You will receive summaries of 2-3 chunks from the same pull request. Generate ONE question that tests whether the reviewer understands how these chunks interact — for example, does a change in chunk A break an assumption in chunk B? Are there cross-cutting concerns like shared state, error propagation, or data flow?
+
+Rules:
+- type: "cross_chunk"
+- format: "free_text" (preferred) or "code_fix" if a concrete fix is testable
+- Include a rubric with required points and disqualifiers
+- skillTags: use tags like "cross_cutting", "integration", "side_effect", "data_flow", "error_propagation"
+- difficulty: "hard" (these are inherently harder)
+- prompt: 1-3 sentences about the interaction between chunks
+- contextLines: reference lines from multiple chunks where relevant
+- derivedFrom.source: "cross_chunk"
+- derivedFrom.refs: list the chunk IDs involved
+- Output JSON: { "questions": [...] } with exactly 1 question.`;
+
 export interface QuestionGenInput {
 	chunkId: string;
 	chunkTitle: string;

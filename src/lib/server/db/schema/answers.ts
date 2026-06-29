@@ -19,6 +19,7 @@ export const answers = sqliteTable(
 		verdict: text('verdict', {
 			enum: ['pass', 'fail', 'borderline', 'review_needed', 'skipped']
 		}),
+		selfConfidence: integer('self_confidence'),
 		submittedAt: integer('submitted_at').notNull(),
 		gradedAt: integer('graded_at')
 	},

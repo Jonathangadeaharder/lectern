@@ -1,9 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import {
 	FindingSchema,
+	SuggestionSchema,
+	PrAgentReviewSchema,
+	PrAgentDescribeSchema,
+	PrAgentImproveSchema,
+	PrAgentAskSchema,
 	PrAgentCrashError,
 	PrAgentParseError,
-	PrAgentReviewSchema,
 	PrAgentSetupError,
 	PrAgentTimeoutError
 } from './index';
@@ -58,6 +62,50 @@ describe('PrAgentReviewSchema', () => {
 	});
 });
 
+describe('PrAgentDescribeSchema', () => {
+	it('validates a minimal describe', () => {
+		const result = PrAgentDescribeSchema.safeParse({ task: 'describe' });
+		expect(result.success).toBe(true);
+		expect(result.success && result.data.title).toBe('');
+		expect(result.success && result.data.labels).toEqual([]);
+	});
+
+	it('validates a describe with title and labels', () => {
+		const result = PrAgentDescribeSchema.safeParse({
+			task: 'describe',
+			title: 'Fix race condition in worker pool',
+			description: 'Adds mutex around shared queue',
+			labels: ['bug fix', 'concurrency']
+		});
+		expect(result.success).toBe(true);
+		expect(result.success && result.data.labels).toContain('concurrency');
+	});
+});
+
+describe('PrAgentImproveSchema', () => {
+	it('validates a minimal improve', () => {
+		const result = PrAgentImproveSchema.safeParse({ task: 'improve' });
+		expect(result.success).toBe(true);
+		expect(result.success && result.data.suggestions).toEqual([]);
+	});
+});
+
+describe('PrAgentAskSchema', () => {
+	it('validates a minimal ask', () => {
+		const result = PrAgentAskSchema.safeParse({ task: 'ask' });
+		expect(result.success).toBe(true);
+		expect(result.success && result.data.answer).toBe('');
+	});
+
+	it('validates ask with answer', () => {
+		const result = PrAgentAskSchema.safeParse({
+			task: 'ask',
+			answer: 'This function returns null on empty input.'
+		});
+		expect(result.success).toBe(true);
+	});
+});
+
 describe('FindingSchema', () => {
 	it('validates with all fields', () => {
 		const result = FindingSchema.safeParse({
@@ -81,6 +129,21 @@ describe('FindingSchema', () => {
 	it('rejects invalid severityHint', () => {
 		const result = FindingSchema.safeParse({ severityHint: 'critical' });
 		expect(result.success).toBe(false);
+	});
+});
+
+describe('SuggestionSchema', () => {
+	it('validates with all fields', () => {
+		const result = SuggestionSchema.safeParse({
+			id: 's1',
+			file: 'src/bar.ts',
+			line: 5,
+			message: 'use const instead of let',
+			suggestion: 'const x = 1',
+			category: 'style',
+			severityHint: 'minor'
+		});
+		expect(result.success).toBe(true);
 	});
 });
 
@@ -121,6 +184,18 @@ describe('PrAgentParseError', () => {
 });
 
 describe('runReview', () => {
+	it.todo('requires integration test with venv + DB');
+});
+
+describe('runDescribe', () => {
+	it.todo('requires integration test with venv + DB');
+});
+
+describe('runImprove', () => {
+	it.todo('requires integration test with venv + DB');
+});
+
+describe('runAsk', () => {
 	it.todo('requires integration test with venv + DB');
 });
 

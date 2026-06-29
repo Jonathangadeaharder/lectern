@@ -13,7 +13,7 @@ import AppShell from './AppShell.svelte';
 describe('AppShell', () => {
 	it('renders sidebar + topbar elements', () => {
 		const { container } = render(AppShell, {
-			crumbs: [{ label: 'Dashboard' }]
+			crumbs: [{ label: 'Dashboard' }],
 		});
 		expect(container.querySelector('.sidebar')).toBeInTheDocument();
 		expect(container.querySelector('.topbar')).toBeInTheDocument();

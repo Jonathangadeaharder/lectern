@@ -1,15 +1,14 @@
 import { recordOverride, runPreflight } from '$lib/server/services/preflight';
 import { error, json } from '@sveltejs/kit';
-import type { RequestEvent } from '@sveltejs/kit';
 
-export async function GET({ params, request }: RequestEvent) {
+export async function GET({ params, request }) {
 	const bundleId = params.bundleId;
 	if (!bundleId) throw error(400, 'missing bundleId');
 	const result = await runPreflight(bundleId, { signal: request.signal });
 	return json(result);
 }
 
-export async function POST({ params, request }: RequestEvent) {
+export async function POST({ params, request }) {
 	const bundleId = params.bundleId;
 	if (!bundleId) throw error(400, 'missing bundleId');
 	const result = await runPreflight(bundleId, { signal: request.signal, force: true });

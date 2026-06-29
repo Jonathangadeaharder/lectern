@@ -23,12 +23,17 @@ export default defineConfig({
 				'src/routes/**/*.svelte',
 				'src/routes/+layout.svelte'
 			],
-			exclude: ['src/**/*.test.{ts,js}', 'src/**/*.spec.{ts,js}', 'src/app.html', 'src/app.d.ts'],
+			exclude: [
+				'src/**/*.test.{ts,js}',
+				'src/**/*.spec.{ts,js}',
+				'src/app.html',
+				'src/app.d.ts'
+			],
 			thresholds: {
-				lines: 30,
-				branches: 60,
-				functions: 70,
-				statements: 30
+				lines: 80,
+				branches: 75,
+				functions: 80,
+				statements: 80
 			}
 		}
 	},
