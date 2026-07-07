@@ -1,0 +1,167 @@
+{
+  "name": "lectern-vscode",
+  "displayName": "Lectern",
+  "description": "Slides / Quiz / Review for a PR — Claude writes, Lectern displays.",
+  "version": "0.1.0",
+  "publisher": "lectern-local",
+  "private": false,
+  "engines": {
+    "vscode": "^1.92.0",
+    "node": ">=20.10"
+  },
+  "categories": [
+    "Other"
+  ],
+  "main": "./out/extension.js",
+  "activationEvents": [
+    "onStartupFinished",
+    "onView:lectern.inbox",
+    "onCommand:lectern.openPanel",
+    "onCommand:lectern.openPanelById",
+    "onCommand:lectern.openPR",
+    "onCommand:lectern.showSlides",
+    "onCommand:lectern.showQuiz",
+    "onCommand:lectern.showReview",
+    "onCommand:lectern.showDiff"
+  ],
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "lectern-deck",
+          "title": "Lectern",
+          "icon": "resources/lectern-icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "lectern-deck": [
+        {
+          "id": "lectern.inbox",
+          "name": "Pull Requests"
+        }
+      ]
+    },
+    "menus": {
+      "view/title": [
+        {
+          "command": "lectern.refresh",
+          "when": "view == lectern.inbox",
+          "group": "navigation"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "lectern.openInBrowser",
+          "when": "view == lectern.inbox && viewItem == mr",
+          "group": "navigation"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "lectern.openPR",
+        "title": "Lectern: Open PR…",
+        "category": "Lectern"
+      },
+      {
+        "command": "lectern.openPanelById",
+        "title": "Lectern: Open Panel by MR ID…",
+        "category": "Lectern"
+      },
+      {
+        "command": "lectern.showSlides",
+        "title": "Lectern: Show Slides",
+        "category": "Lectern"
+      },
+      {
+        "command": "lectern.showQuiz",
+        "title": "Lectern: Show Quiz",
+        "category": "Lectern"
+      },
+      {
+        "command": "lectern.showReview",
+        "title": "Lectern: Show Review",
+        "category": "Lectern"
+      },
+      {
+        "command": "lectern.showDiff",
+        "title": "Lectern: Show Diff",
+        "category": "Lectern"
+      },
+      {
+        "command": "lectern.refresh",
+        "title": "Refresh",
+        "category": "Lectern",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "lectern.openInBrowser",
+        "title": "Open in Browser",
+        "category": "Lectern",
+        "icon": "$(link-external)"
+      },
+      {
+        "command": "lectern.openLectern",
+        "title": "Lectern: Open .lectern Dir",
+        "category": "Lectern"
+      },
+      {
+        "command": "lectern.showLogs",
+        "title": "Lectern: Show Logs",
+        "category": "Lectern"
+      },
+      {
+        "command": "lectern.openSettings",
+        "title": "Lectern: Open Settings",
+        "category": "Lectern"
+      },
+      {
+        "command": "lectern.setGitlabToken",
+        "title": "Lectern: Set GitLab Token",
+        "category": "Lectern"
+      },
+      {
+        "command": "lectern.clearGitlabToken",
+        "title": "Lectern: Clear GitLab Token",
+        "category": "Lectern"
+      }
+    ],
+    "configuration": {
+      "title": "Lectern",
+      "properties": {
+        "lectern.gitlabHost": {
+          "type": "string",
+          "default": "git.cgm.ag",
+          "scope": "machine",
+          "description": "GitLab hostname for the PR inbox fetch (e.g. git.cgm.ag)."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "build": "node esbuild.config.mjs --production",
+    "watch": "node esbuild.config.mjs --watch",
+    "package": "pnpm build && vsce package --no-dependencies",
+    "e2e": "uv run --with mss --with pillow --with scikit-image --with numpy python tools/e2e/run.py",
+    "e2e:baseline": "uv run --with mss --with pillow --with scikit-image --with numpy python tools/e2e/run.py --update-baselines"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "@types/vscode": "^1.92.0",
+    "@vscode/codicons": "^0.0.45",
+    "@vscode/vsce": "^3.0.0",
+    "esbuild": "^0.25.0",
+    "esbuild-svelte": "^0.9.0",
+    "svelte": "^5.2.0",
+    "svelte-preprocess": "^6.0.0",
+    "typescript": "^5.6.0"
+  },
+  "dependencies": {
+    "@types/dompurify": "^3.2.0",
+    "chokidar": "^3.6.0",
+    "dompurify": "^3.4.11",
+    "marked": "^18.0.5",
+    "zod": "^3.23.8"
+  }
+}

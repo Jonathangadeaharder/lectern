@@ -23,3 +23,13 @@ drizzle/meta/
 
 # GitLab Runner state — registered per host, never to be committed
 .runner_system_id
+
+# Live-probe outputs (real LLM calls, run locally only)
+tools/live-probe/results/
+
+# VS Code extension build artifacts
+apps/vscode/out/
+apps/vscode/*.vsix
+apps/vscode/resources/codicon.*
+apps/vscode/tools/e2e/artifacts/
+apps/vscode/tools/e2e/baselines/
