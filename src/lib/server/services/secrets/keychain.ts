@@ -12,6 +12,16 @@ import { resolveDataDir } from '$lib/server/config/paths';
  *   - `llm.quick`        — quick-start LLM token (#7)
  *   - `github`           — GitHub PAT (#3)
  *   - `gitlab:<host>`    — GitLab PAT per host (deferred to v1.1; placeholder)
+ *
+ * Threat model (file fallback):
+ *   The fallback key is derived solely from the machine id (IOPlatformUUID on
+ *   macOS, /etc/machine-id on Linux) via argon2id. That id is readable by any
+ *   local user, so the fallback protects only against offline disk/backup
+ *   theft — NOT against another local account on the same machine. If
+ *   machine-id detection fails, a hardcoded constant shared by every machine
+ *   is used, which offers no real protection. Prefer the OS keychain (install
+ *   libsecret on Linux); `lectern doctor` reports the active backend and warns
+ *   when the fallback is in use.
  */
 import keytar from 'keytar';
 
