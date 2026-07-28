@@ -72,11 +72,14 @@ async function doctor(): Promise<void> {
 
 async function serve(): Promise<void> {
 	const { execa } = await import('execa');
-	console.log('Starting Lectern server...');
+	// Bind localhost by default: the API acts with the user's stored PAT/LLM key
+	// and has no auth, so it must not be exposed to the LAN. Override via HOST.
+	const host = process.env.HOST ?? '127.0.0.1';
+	console.log(`Starting Lectern server on ${host}...`);
 	try {
 		await execa('node', ['build/index.js'], {
 			stdio: 'inherit',
-			env: { ...process.env }
+			env: { ...process.env, HOST: host }
 		});
 	} catch {
 		console.log('Build not found. Run `pnpm build` first, or use `pnpm dev` for development.');
