@@ -278,9 +278,10 @@ function parseYamlCatalog(raw: string): AiTypicalPattern[] {
 		const fileGlobs: string[] = [];
 		const globBlock = block.match(/file_globs:\s*\n((?:\s+-\s+.*\n?)*)/);
 		if (globBlock) {
-			for (const line of globBlock[1]!.split('\n')) {
+			for (const line of globBlock[1]?.split('\n') ?? []) {
 				const m = line.match(/^\s+-\s+"?([^"\n]+)"?/);
-				if (m) fileGlobs.push(m[1]!.trim());
+				const glob = m?.[1]?.trim();
+				if (glob) fileGlobs.push(glob);
 			}
 		}
 
@@ -428,8 +429,9 @@ export function ingestCommitsIncremental(
 
 	const results = toProcess.map((c) => ingestCommit({ repoSlug, ...c }));
 
-	if (toProcess.length > 0) {
-		updateScanState(repoSlug, toProcess[0]!.sha, toProcess.length);
+	const first = toProcess[0];
+	if (first) {
+		updateScanState(repoSlug, first.sha, toProcess.length);
 	}
 
 	return results;
