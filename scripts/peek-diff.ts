@@ -4,9 +4,7 @@ import { readBundleDiff } from '../src/lib/server/services/ingestion/bundle';
 
 const db = new Database(dbPath());
 const b = db
-	.prepare(
-		`SELECT file_path FROM bundles WHERE pr_number = 6252 ORDER BY fetched_at DESC LIMIT 1`
-	)
+	.prepare(`SELECT file_path FROM bundles WHERE pr_number = 6252 ORDER BY fetched_at DESC LIMIT 1`)
 	.get() as { file_path: string };
 const diff = await readBundleDiff(b.file_path);
 if (!diff) {

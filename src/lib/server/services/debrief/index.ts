@@ -8,7 +8,6 @@ import {
 	sessionQuestions,
 	sessions
 } from '../../db/schema';
-import type { Question } from '../llm/schemas';
 
 const VERDICT_VALUE: Record<string, number> = {
 	pass: 1,

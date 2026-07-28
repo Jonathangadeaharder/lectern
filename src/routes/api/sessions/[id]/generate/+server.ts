@@ -1,11 +1,11 @@
+import type { RequestEvent } from '@sveltejs/kit';
+import { error, json } from '@sveltejs/kit';
+import { eq } from 'drizzle-orm';
+import { z } from 'zod';
 import { getDb } from '$lib/server/db';
 import { chunkSets, sessionQuestions, sessions } from '$lib/server/db/schema';
 import type { Chunk } from '$lib/server/services/chunking';
 import { generateQuestionsForChunk } from '$lib/server/services/questions';
-import { error, json } from '@sveltejs/kit';
-import type { RequestEvent } from '@sveltejs/kit';
-import { eq } from 'drizzle-orm';
-import { z } from 'zod';
 
 const BodySchema = z.object({
 	chunkId: z.string().optional(),

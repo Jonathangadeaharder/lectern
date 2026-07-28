@@ -1,10 +1,10 @@
 import { randomUUID } from 'node:crypto';
-import { and, eq } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import { getDb } from '../../db';
 import { answers, bundles, sessionChunks, sessionQuestions, sessions } from '../../db/schema';
 import { chunkBundle } from '../chunking';
 import { generateQuestionsForChunk } from '../questions';
-import { type SessionEvent, type SessionState, nextState } from './machine';
+import { nextState, type SessionEvent, type SessionState } from './machine';
 
 export interface SessionRow {
 	id: string;

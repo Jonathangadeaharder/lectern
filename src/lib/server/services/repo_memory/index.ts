@@ -1,15 +1,15 @@
-import { eq } from 'drizzle-orm';
 import { randomUUID } from 'node:crypto';
 import { readFile, stat } from 'node:fs/promises';
 import { join } from 'node:path';
+import { eq } from 'drizzle-orm';
 import { getDb } from '../../db';
 import {
+	answers,
+	bundles,
 	repoConventions,
 	repoWeakSpots,
 	sessionQuestions,
-	answers,
-	sessions,
-	bundles
+	sessions
 } from '../../db/schema';
 
 export type ConventionSource =
@@ -232,9 +232,7 @@ export async function readConventionFiles(
 				content: processedContent
 			});
 			results.push(row);
-		} catch {
-			continue;
-		}
+		} catch {}
 	}
 
 	return results;

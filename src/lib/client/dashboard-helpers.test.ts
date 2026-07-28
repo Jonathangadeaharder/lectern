@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest';
-import { intensity, scorePercent, averageScore } from './dashboard-helpers';
+import { describe, expect, it } from 'vitest';
+import { averageScore, intensity, scorePercent } from './dashboard-helpers';
 
 describe('intensity', () => {
 	it('returns 0 when count is 0 or max is 0', () => {

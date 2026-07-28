@@ -320,9 +320,9 @@
 	*,
 	*::before,
 	*::after {
-		transition-duration: 50ms !important;
-		animation-duration: 50ms !important;
-		animation-iteration-count: 1 !important;
-		scroll-behavior: auto !important;
+		transition-duration: 50ms;
+		animation-duration: 50ms;
+		animation-iteration-count: 1;
+		scroll-behavior: auto;
 	}
 }

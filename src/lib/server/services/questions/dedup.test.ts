@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Question } from '../llm/schemas';
 
-function makeQuestion(overrides?: Partial<Question>): Question {
+function _makeQuestion(overrides?: Partial<Question>): Question {
 	return {
 		id: 'q1',
 		chunkId: 'c1',

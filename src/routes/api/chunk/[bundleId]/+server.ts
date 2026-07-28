@@ -1,6 +1,6 @@
-import { chunkBundle } from '$lib/server/services/chunking';
-import { error, json } from '@sveltejs/kit';
 import type { RequestEvent } from '@sveltejs/kit';
+import { error, json } from '@sveltejs/kit';
+import { chunkBundle } from '$lib/server/services/chunking';
 
 export async function GET({ params, request }: RequestEvent) {
 	const bundleId = params.bundleId;

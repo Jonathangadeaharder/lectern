@@ -1,20 +1,19 @@
 import { eq, gte } from 'drizzle-orm';
 import { getDb } from '../../db';
 import {
-	sessions,
 	answers,
-	sessionQuestions,
 	bundles,
-	sessionActivity,
-	repoCompetence,
-	skillMastery,
 	debriefs,
-	repoWeakSpots,
+	masteryHistory,
+	repoCompetence,
 	repoConventions,
-	masteryHistory
+	repoWeakSpots,
+	sessionActivity,
+	sessions,
+	skillMastery
 } from '../../db/schema';
+import { getBugPatterns } from '../bug_mining';
 import { getMasteryByTag, type SkillMasteryRow } from '../mastery';
-import { getBugPatterns, type BugPatternRow } from '../bug_mining';
 
 export interface HeatmapDay {
 	date: string;

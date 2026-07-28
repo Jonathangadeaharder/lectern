@@ -73,7 +73,7 @@ describe('detectMovedFrom', () => {
 			'}'
 		];
 		const hunk = mkHunk(block);
-		const reformatted = block.map((l) => l.replace(/  /g, '\t')).join('\n');
+		const reformatted = block.map((l) => l.replace(/ {2}/g, '\t')).join('\n');
 		const moved = detectMovedFrom(hunk, [{ path: 'src.ts', content: reformatted }]);
 		expect(moved).toBeDefined();
 	});

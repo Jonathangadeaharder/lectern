@@ -168,7 +168,7 @@ export function groupHunksToChunks(hunks: Hunk[]): Chunk[] {
 	for (const g of merged) {
 		const allHunks = g.files.flatMap((f) => byFile.get(f) ?? []);
 		const relImports = extractRelativeImportsFromHunks(allHunks);
-		const resolved = relImports.map((imp) => g.files.map((f) => resolveImportPath(f, imp))).flat();
+		const resolved = relImports.flatMap((imp) => g.files.map((f) => resolveImportPath(f, imp)));
 		groupImports.set(g.files, resolved);
 	}
 

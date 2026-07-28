@@ -1,8 +1,8 @@
 import 'dotenv/config';
-import { resolveDataDir } from '$lib/server/config/paths';
-import { getQuickConfig } from '$lib/server/services/llm/quick_config';
 import type { Handle } from '@sveltejs/kit';
 import { redirect } from '@sveltejs/kit';
+import { resolveDataDir } from '$lib/server/config/paths';
+import { getQuickConfig } from '$lib/server/services/llm/quick_config';
 
 const ALLOW_PREFIXES = ['/onboarding', '/settings', '/api/settings', '/api/health', '/_app/'];
 

@@ -1,10 +1,10 @@
-import { eq, and } from 'drizzle-orm';
 import { randomUUID } from 'node:crypto';
+import { and, eq } from 'drizzle-orm';
 import { getDb } from '../../db';
-import { skillMastery, masteryHistory, sessionQuestions, answers } from '../../db/schema';
+import { answers, masteryHistory, sessionQuestions, skillMastery } from '../../db/schema';
 
 const EWMA_ALPHA = 0.3;
-const DECAY_RATE_PER_DAY = 1 - Math.pow(0.95, 1 / 30);
+const DECAY_RATE_PER_DAY = 1 - 0.95 ** (1 / 30);
 const MASTERY_FLOOR = 0.3;
 const LEVEL_THRESHOLDS = {
 	novice: 0,
@@ -63,7 +63,7 @@ export function classifyLevel(score: number): MasteryLevel {
 
 export function decayScore(score: number, daysSinceLast: number): number {
 	if (daysSinceLast <= 0) return Math.max(score, MASTERY_FLOOR);
-	return Math.max(score * Math.pow(1 - DECAY_RATE_PER_DAY, daysSinceLast), MASTERY_FLOOR);
+	return Math.max(score * (1 - DECAY_RATE_PER_DAY) ** daysSinceLast, MASTERY_FLOOR);
 }
 
 export function updateMastery(params: {

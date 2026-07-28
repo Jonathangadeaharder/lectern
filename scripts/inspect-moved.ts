@@ -28,11 +28,11 @@ for (const c of chunks) {
 			console.log(
 				'MOVED',
 				h.file,
-				'+' + h.addedLines,
+				`+${h.addedLines}`,
 				'<-',
 				h.movedFrom.file,
 				`${h.movedFrom.startLine}-${h.movedFrom.endLine}`,
-				Math.round(h.movedFrom.matchRatio * 100) + '%'
+				`${Math.round(h.movedFrom.matchRatio * 100)}%`
 			);
 		}
 	}

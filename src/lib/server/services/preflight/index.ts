@@ -2,16 +2,16 @@ import { randomUUID } from 'node:crypto';
 import { and, eq } from 'drizzle-orm';
 import { getDb } from '../../db';
 import { bundles, preflightOverrides, preflightResults } from '../../db/schema';
+import { readBundleManifest } from '../ingestion/bundle';
 import {
+	isPrAgentAvailable,
 	PrAgentCrashError,
 	PrAgentParseError,
 	type PrAgentReview,
 	PrAgentSetupError,
 	PrAgentTimeoutError,
-	isPrAgentAvailable,
 	runReview
 } from '../pr_agent';
-import { readBundleManifest } from '../ingestion/bundle';
 
 const LARGE_PR_FILE_THRESHOLD = 20;
 const LARGE_FILE_LINE_THRESHOLD = 500;

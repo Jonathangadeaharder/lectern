@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest';
 import { render } from '@testing-library/svelte';
+import { describe, expect, it } from 'vitest';
 import LecternMark from './LecternMark.svelte';
 
 describe('LecternMark', () => {
@@ -11,6 +11,6 @@ describe('LecternMark', () => {
 
 	it('applies size prop', () => {
 		const { container } = render(LecternMark, { size: 56 });
-		expect(container.querySelector('svg')!.getAttribute('width')).toBe('56');
+		expect(container.querySelector('svg')?.getAttribute('width')).toBe('56');
 	});
 });

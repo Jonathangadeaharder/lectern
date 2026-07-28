@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { UnsafeBundlePathError, sanitizeBundlePath } from './bundle';
+import { sanitizeBundlePath, UnsafeBundlePathError } from './bundle';
 
 describe('sanitizeBundlePath', () => {
 	it('accepts a simple relative path', () => {

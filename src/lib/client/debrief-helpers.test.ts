@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest';
-import { totalsAcrossChunks, bandFor } from './debrief-helpers';
+import { describe, expect, it } from 'vitest';
+import { bandFor, totalsAcrossChunks } from './debrief-helpers';
 
 describe('totalsAcrossChunks', () => {
 	it('sums answered and total', () => {

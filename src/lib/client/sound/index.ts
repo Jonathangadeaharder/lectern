@@ -8,8 +8,9 @@ import {
 	playSound
 } from './bus.svelte';
 import type { SoundName } from './types';
-export type { SoundConfig, SoundName, SoundEventName } from './types';
-export { SOUND_NAMES, EVENT_SOUND_MAP } from './types';
+
+export type { SoundConfig, SoundEventName, SoundName } from './types';
+export { EVENT_SOUND_MAP, SOUND_NAMES } from './types';
 
 let toastCallback: ((message: string) => void) | null = null;
 

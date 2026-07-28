@@ -1,6 +1,6 @@
-import { generateDebrief } from '$lib/server/services/debrief';
-import { error, json } from '@sveltejs/kit';
 import type { RequestEvent } from '@sveltejs/kit';
+import { error, json } from '@sveltejs/kit';
+import { generateDebrief } from '$lib/server/services/debrief';
 
 export async function GET({ params }: RequestEvent) {
 	const id = params.id;

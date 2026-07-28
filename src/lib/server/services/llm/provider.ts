@@ -2,16 +2,16 @@ import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
 import type { LanguageModel } from 'ai';
 import { getKey } from '../secrets/keychain';
 import { LlmAuthError, LlmNotConfiguredError } from './errors';
-import { type QuickConfig, getQuickConfig } from './quick_config';
+import { getQuickConfig, type QuickConfig } from './quick_config';
 import { resolveSecret } from './secret_ref';
 import { getTaskOverride } from './task_config';
 import type { TaskName } from './tasks';
 
-let cachedKey: string | undefined;
+let _cachedKey: string | undefined;
 let cachedConfig: QuickConfig | undefined;
 
 export function invalidateProviderCache(): void {
-	cachedKey = undefined;
+	_cachedKey = undefined;
 	cachedConfig = undefined;
 }
 
@@ -23,7 +23,7 @@ export async function getModel(task?: TaskName): Promise<LanguageModel> {
 	if (!stored) throw new LlmAuthError('No API token stored. Re-run onboarding.');
 	const token = resolveSecret(stored);
 
-	cachedKey = token;
+	_cachedKey = token;
 	cachedConfig = cfg;
 
 	let endpoint = cfg.endpoint;

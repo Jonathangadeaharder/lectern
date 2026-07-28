@@ -17,5 +17,5 @@ export function useShell(pathname: string): boolean {
 
 export function isNavActive(href: string, pathname: string): boolean {
 	if (href === '/') return pathname === '/';
-	return pathname === href || pathname.startsWith(href + '/');
+	return pathname === href || pathname.startsWith(`${href}/`);
 }

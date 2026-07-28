@@ -1,5 +1,5 @@
-import { describe, it, expect, vi } from 'vitest';
 import { render } from '@testing-library/svelte';
+import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('$lib/client/OnboardingBanner.svelte', () => ({ default: () => ({}) }));
 vi.mock('$lib/client/OfflineBanner.svelte', () => ({ default: () => ({}) }));

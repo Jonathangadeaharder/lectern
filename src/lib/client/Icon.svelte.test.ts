@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest';
 import { render } from '@testing-library/svelte';
+import { describe, expect, it } from 'vitest';
 import Icon from './Icon.svelte';
 
 const NAMES = [
@@ -55,6 +55,6 @@ describe('Icon', () => {
 
 	it('is aria-hidden', () => {
 		const { container } = render(Icon, { name: 'home' });
-		expect(container.querySelector('svg')!.getAttribute('aria-hidden')).toBe('true');
+		expect(container.querySelector('svg')?.getAttribute('aria-hidden')).toBe('true');
 	});
 });

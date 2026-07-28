@@ -1,6 +1,6 @@
+import { json } from '@sveltejs/kit';
 import { getDb } from '$lib/server/db';
 import { answers, debriefs, sessionActivity, sessions } from '$lib/server/db/schema';
-import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 
 export const DELETE: RequestHandler = async () => {

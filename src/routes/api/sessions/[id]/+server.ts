@@ -1,3 +1,6 @@
+import type { RequestEvent } from '@sveltejs/kit';
+import { error, json } from '@sveltejs/kit';
+import { eq } from 'drizzle-orm';
 import { getDb } from '$lib/server/db';
 import { bundles, chunkSets, sessionQuestions, sessions } from '$lib/server/db/schema';
 import {
@@ -6,9 +9,6 @@ import {
 	isGenerating,
 	listSessionAnswers
 } from '$lib/server/services/session';
-import { error, json } from '@sveltejs/kit';
-import type { RequestEvent } from '@sveltejs/kit';
-import { eq } from 'drizzle-orm';
 
 export async function GET({ params }: RequestEvent) {
 	const id = params.id;

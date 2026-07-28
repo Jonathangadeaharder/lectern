@@ -1,10 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-	IllegalSessionTransition,
-	type SessionEvent,
-	type SessionState,
-	nextState
-} from './machine';
+import { IllegalSessionTransition, nextState } from './machine';
 
 describe('nextState', () => {
 	describe('start event', () => {

@@ -1,7 +1,7 @@
-import { beforeAll, afterEach, afterAll, describe, it, expect, vi } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/svelte';
-import { http, HttpResponse } from 'msw';
+import { HttpResponse, http } from 'msw';
 import { setupServer } from 'msw/node';
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import Debrief from './+page.svelte';
 
 vi.mock('$lib/client/sound/events', () => ({ emit: vi.fn() }));

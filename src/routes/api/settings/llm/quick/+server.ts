@@ -1,13 +1,13 @@
+import type { RequestEvent } from '@sveltejs/kit';
+import { error, json } from '@sveltejs/kit';
+import { z } from 'zod';
 import { invalidateProviderCache } from '$lib/server/services/llm/provider';
 import {
-	QuickConfigSchema,
 	getQuickConfig,
+	QuickConfigSchema,
 	setQuickConfig
 } from '$lib/server/services/llm/quick_config';
 import { hasKey, setKey } from '$lib/server/services/secrets/keychain';
-import { error, json } from '@sveltejs/kit';
-import type { RequestEvent } from '@sveltejs/kit';
-import { z } from 'zod';
 
 export async function GET() {
 	const cfg = await getQuickConfig();

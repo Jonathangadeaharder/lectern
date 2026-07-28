@@ -1,10 +1,9 @@
-import { and, eq } from 'drizzle-orm';
 import { randomUUID } from 'node:crypto';
-import { readFileSync, existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { and, eq } from 'drizzle-orm';
 import { getDb } from '../../db';
 import { bugCommits, bugPatterns, repoScanState } from '../../db/schema';
-import type { ConventionSource } from '../repo_memory';
 
 const BUG_FIX_PATTERNS = [
 	/\bfix(es|ed)?\b/i,
@@ -135,7 +134,10 @@ export function szzTraceBack(params: {
 	for (const file of files) {
 		const blameSha = params.getBlame(params.bugFixSha, file);
 		if (blameSha && blameSha !== params.bugFixSha) {
-			db.update(bugCommits).set({ blameSha }).where(and(eq(bugCommits.repoSlug, params.repoSlug), eq(bugCommits.sha, params.bugFixSha))).run();
+			db.update(bugCommits)
+				.set({ blameSha })
+				.where(and(eq(bugCommits.repoSlug, params.repoSlug), eq(bugCommits.sha, params.bugFixSha)))
+				.run();
 			return blameSha;
 		}
 	}
@@ -245,9 +247,7 @@ export function loadAiTypicalCatalog(): AiTypicalPattern[] {
 		try {
 			const raw = readFileSync(path, 'utf8');
 			return parseYamlCatalog(raw);
-		} catch {
-			continue;
-		}
+		} catch {}
 	}
 	return [];
 }

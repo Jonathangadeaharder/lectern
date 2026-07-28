@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { GradingResult, Question, Rubric } from '../llm/schemas';
+import type { GradingResult, Question } from '../llm/schemas';
 import { clearGradingCache } from './index';
 
 vi.mock('../../db', () => ({

@@ -1,7 +1,6 @@
 import { createCipheriv, createDecipheriv, randomBytes } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { resolveDataDir } from '$lib/server/config/paths';
 /**
  * Keychain wrapper with encrypted file fallback.
  *
@@ -24,6 +23,7 @@ import { resolveDataDir } from '$lib/server/config/paths';
  *   when the fallback is in use.
  */
 import keytar from 'keytar';
+import { resolveDataDir } from '$lib/server/config/paths';
 
 const SERVICE = 'dev.lectern.keys';
 const FALLBACK_DIR = 'secrets-fallback';

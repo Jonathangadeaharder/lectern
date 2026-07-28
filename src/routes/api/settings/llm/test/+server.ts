@@ -1,9 +1,9 @@
+import type { RequestEvent } from '@sveltejs/kit';
+import { error, json } from '@sveltejs/kit';
 import {
 	TestConnectionRequestSchema,
 	testConnection
 } from '$lib/server/services/llm/test_connection';
-import { error, json } from '@sveltejs/kit';
-import type { RequestEvent } from '@sveltejs/kit';
 
 export async function POST({ request }: RequestEvent) {
 	const body = await request.json().catch(() => null);

@@ -1,10 +1,10 @@
+import type { RequestEvent } from '@sveltejs/kit';
+import { error } from '@sveltejs/kit';
+import { eq } from 'drizzle-orm';
 import { getDb } from '$lib/server/db';
 import { chunkSets, sessions } from '$lib/server/db/schema';
 import type { Chunk } from '$lib/server/services/chunking';
 import { describeSession } from '$lib/server/services/session';
-import { error } from '@sveltejs/kit';
-import type { RequestEvent } from '@sveltejs/kit';
-import { eq } from 'drizzle-orm';
 
 export async function load({ params }: RequestEvent) {
 	const id = params.id;

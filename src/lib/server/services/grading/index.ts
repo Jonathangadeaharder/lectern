@@ -1,5 +1,4 @@
-import { randomUUID } from 'node:crypto';
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { eq } from 'drizzle-orm';
 import { getDb } from '../../db';
 import { answers, sessionQuestions } from '../../db/schema';
@@ -247,7 +246,7 @@ async function gradeFreeText(args: {
 
 function gradeCodeFix(question: Question, payload: CodeFixPayload): GradingResult {
 	const expected = question.expectedCode ?? '';
-	const original = question.originalCode ?? '';
+	const _original = question.originalCode ?? '';
 	const submitted = payload.code;
 
 	const normExpected = normalizeCode(expected);

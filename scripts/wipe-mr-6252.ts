@@ -10,7 +10,10 @@ const pr = 6252;
 const bundleRows = db
 	.prepare('SELECT id FROM bundles WHERE repo_slug = ? AND pr_number = ?')
 	.all(slug, pr) as Array<{ id: string }>;
-console.log('Bundle IDs to wipe:', bundleRows.map((r) => r.id));
+console.log(
+	'Bundle IDs to wipe:',
+	bundleRows.map((r) => r.id)
+);
 
 for (const { id } of bundleRows) {
 	const s = db.prepare('DELETE FROM sessions WHERE bundle_id = ?').run(id);

@@ -1,5 +1,5 @@
-import { deleteKey, listAccounts } from '$lib/server/services/secrets/keychain';
 import { json } from '@sveltejs/kit';
+import { deleteKey, listAccounts } from '$lib/server/services/secrets/keychain';
 import type { RequestHandler } from './$types';
 
 export const DELETE: RequestHandler = async () => {

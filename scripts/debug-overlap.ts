@@ -1,13 +1,11 @@
 import Database from 'better-sqlite3';
 import { dbPath } from '../src/lib/server/config/paths';
-import { readBundleDiff } from '../src/lib/server/services/ingestion/bundle';
 import { parsePatchToHunks } from '../src/lib/server/services/chunking/diff';
+import { readBundleDiff } from '../src/lib/server/services/ingestion/bundle';
 
 const db = new Database(dbPath());
 const b = db
-	.prepare(
-		`SELECT file_path FROM bundles WHERE pr_number = 6252 ORDER BY fetched_at DESC LIMIT 1`
-	)
+	.prepare(`SELECT file_path FROM bundles WHERE pr_number = 6252 ORDER BY fetched_at DESC LIMIT 1`)
 	.get() as { file_path: string } | undefined;
 if (!b) {
 	console.log('no bundle');
@@ -22,9 +20,21 @@ const hunks = parsePatchToHunks(diff);
 const sorted = [...hunks].sort((a, b) => b.addedLines - a.addedLines);
 const top = sorted[0];
 if (!top) process.exit(0);
-console.log('Top hunk:', top.file, 'old', top.oldStart + '/' + top.oldLines, 'new', top.newStart + '/' + top.newLines, '+' + top.addedLines + ' -' + top.removedLines);
-const added = top.lines.filter((l) => l.type === 'add').map((l) => l.content.replace(/\s+/g, ' ').trim());
-const deleted = top.lines.filter((l) => l.type === 'del').map((l) => l.content.replace(/\s+/g, ' ').trim());
+console.log(
+	'Top hunk:',
+	top.file,
+	'old',
+	`${top.oldStart}/${top.oldLines}`,
+	'new',
+	`${top.newStart}/${top.newLines}`,
+	`+${top.addedLines} -${top.removedLines}`
+);
+const added = top.lines
+	.filter((l) => l.type === 'add')
+	.map((l) => l.content.replace(/\s+/g, ' ').trim());
+const deleted = top.lines
+	.filter((l) => l.type === 'del')
+	.map((l) => l.content.replace(/\s+/g, ' ').trim());
 
 const SH = 4;
 function shingles(arr: string[]): string[] {
@@ -53,4 +63,9 @@ console.log('ratio (matched / added shingles) =', (matched.size / addSh.size).to
 const addLines = new Set(added);
 let lineMatches = 0;
 for (const d of deleted) if (addLines.has(d)) lineMatches++;
-console.log('Single-line overlap: deleted lines also present in added =', lineMatches, '/', deleted.length);
+console.log(
+	'Single-line overlap: deleted lines also present in added =',
+	lineMatches,
+	'/',
+	deleted.length
+);

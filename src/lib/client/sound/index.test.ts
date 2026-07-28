@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mockPlaySound = vi.fn();
 const mockEnsureHowler = vi.fn().mockResolvedValue(true);

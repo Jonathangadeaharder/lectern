@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
-import { readdirSync, statSync } from 'fs';
-import { join } from 'path';
+import { readdirSync, statSync } from 'node:fs';
+import { join } from 'node:path';
 
 const SOUNDS_DIR = join(import.meta.dirname, '..', 'static', 'sounds');
 const MAX_TOTAL_KB = 100;

@@ -11,7 +11,7 @@ vi.mock('howler', () => {
 	return {
 		Howl: vi.fn((opts: any) => {
 			if (opts.onloaderror) {
-				mockHowl.on.mockImplementation((event: string, cb: Function) => {
+				mockHowl.on.mockImplementation((event: string, _cb: Function) => {
 					if (event === 'loaderror' && opts.onloaderror) opts.onloaderror(0);
 					if (event === 'playerror' && opts.onplayerror) opts.onplayerror(0);
 				});

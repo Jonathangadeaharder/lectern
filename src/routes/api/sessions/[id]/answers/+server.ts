@@ -1,7 +1,7 @@
-import { gradeAnswer, streamGradeFreeText } from '$lib/server/services/grading';
-import { error, json } from '@sveltejs/kit';
 import type { RequestEvent } from '@sveltejs/kit';
+import { error, json } from '@sveltejs/kit';
 import { z } from 'zod';
+import { gradeAnswer, streamGradeFreeText } from '$lib/server/services/grading';
 
 const McSchema = z.object({
 	format: z.literal('multiple_choice'),

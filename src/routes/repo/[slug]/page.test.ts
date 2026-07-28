@@ -1,12 +1,19 @@
-import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/svelte';
+import { describe, expect, it } from 'vitest';
 import RepoProfile from './+page.svelte';
 
 function payload(over: Record<string, unknown> = {}) {
 	return {
 		profile: {
 			repoSlug: 'drizzle-team/orm',
-			competence: { repoSlug: 'drizzle-team/orm', totalSessions: 9, totalQuestions: 81, avgScore: 0.62, lastSessionAt: null, updatedAt: Date.now() },
+			competence: {
+				repoSlug: 'drizzle-team/orm',
+				totalSessions: 9,
+				totalQuestions: 81,
+				avgScore: 0.62,
+				lastSessionAt: null,
+				updatedAt: Date.now()
+			},
 			skills: [],
 			weakSpots: [],
 			bugPatterns: [],

@@ -1,6 +1,6 @@
+import { json } from '@sveltejs/kit';
 import { dbPath, resolveDataDir } from '$lib/server/config/paths';
 import { getQuickConfig } from '$lib/server/services/llm/quick_config';
-import { json } from '@sveltejs/kit';
 
 export async function GET() {
 	const cfg = await getQuickConfig();

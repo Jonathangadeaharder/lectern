@@ -14,16 +14,23 @@ if (!s) {
 	console.log('no session');
 	process.exit(0);
 }
-const cs = db
-	.prepare('SELECT chunks_json FROM chunk_sets WHERE bundle_id = ?')
-	.get(s.bundle_id) as { chunks_json: string } | undefined;
+const cs = db.prepare('SELECT chunks_json FROM chunk_sets WHERE bundle_id = ?').get(s.bundle_id) as
+	| { chunks_json: string }
+	| undefined;
 if (!cs) {
 	console.log('no chunks');
 	process.exit(0);
 }
 const chunks = JSON.parse(cs.chunks_json) as Array<{
 	id: string;
-	hunks: Array<{ file: string; newStart: number; newLines: number; addedLines: number; removedLines: number; lines: Array<{ type: string }> }>;
+	hunks: Array<{
+		file: string;
+		newStart: number;
+		newLines: number;
+		addedLines: number;
+		removedLines: number;
+		lines: Array<{ type: string }>;
+	}>;
 }>;
 for (const c of chunks) {
 	console.log('chunk', c.id);
@@ -35,9 +42,9 @@ for (const c of chunks) {
 		console.log(
 			'  hunk',
 			h.file,
-			'newStart=' + h.newStart,
-			'newLines=' + h.newLines,
-			'+' + h.addedLines + '-' + h.removedLines,
+			`newStart=${h.newStart}`,
+			`newLines=${h.newLines}`,
+			`+${h.addedLines}-${h.removedLines}`,
 			'lines:',
 			counts
 		);

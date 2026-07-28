@@ -1,7 +1,6 @@
 import { Octokit } from '@octokit/rest';
 import { getKey } from '../secrets/keychain';
 import type { PlatformClient, PrCommit, PrMetadata } from './types';
-import type { ParsedPrUrl } from './url';
 
 let cachedToken: string | null = null;
 let octokit: Octokit | null = null;

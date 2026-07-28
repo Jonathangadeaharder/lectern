@@ -1,11 +1,10 @@
 #!/usr/bin/env node
 
-import { createServer } from 'http';
-import { readFile, stat } from 'fs/promises';
-import { join, basename } from 'path';
-import { createReadStream } from 'fs';
-import { readdirSync } from 'fs';
-import readline from 'readline';
+import { createReadStream, readdirSync } from 'node:fs';
+import { stat } from 'node:fs/promises';
+import { createServer } from 'node:http';
+import { basename, join } from 'node:path';
+import readline from 'node:readline';
 
 const SOUNDS_DIR = join(import.meta.dirname, '..', 'static', 'sounds');
 const PORT = 3456;
@@ -66,7 +65,7 @@ setTimeout(() => {
 </html>`;
 
 const playLog = [];
-let testDone = false;
+let _testDone = false;
 let doneResolve;
 const donePromise = new Promise((r) => {
 	doneResolve = r;
@@ -95,7 +94,7 @@ const server = createServer(async (req, res) => {
 		let body = '';
 		req.on('data', (c) => (body += c));
 		req.on('end', () => {
-			testDone = true;
+			_testDone = true;
 			try {
 				const timestamps = JSON.parse(body);
 				playLog.length = 0;
@@ -151,7 +150,7 @@ async function cleanup() {
 		};
 		const outDir = join(import.meta.dirname, '..', 'tests', 'fatigue', 'results');
 		const outFile = join(outDir, `${soundName}-${date}.json`);
-		import('fs').then((fs) => {
+		import('node:fs').then((fs) => {
 			fs.writeFileSync(outFile, JSON.stringify(result, null, 2));
 			console.log(`Result saved: ${outFile}`);
 			rl.close();

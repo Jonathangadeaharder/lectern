@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest';
-import { useShell, isNavActive } from './shell';
+import { describe, expect, it } from 'vitest';
+import { isNavActive, useShell } from './shell';
 
 describe('useShell', () => {
 	it.each([

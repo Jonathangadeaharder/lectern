@@ -3,7 +3,6 @@
 // Idempotent: drops and recreates tables before inserting.
 
 import Database from 'better-sqlite3';
-import path from 'node:path';
 
 if (!process.env.LECTERN_DB_PATH) {
 	throw new Error(

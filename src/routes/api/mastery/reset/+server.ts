@@ -1,5 +1,5 @@
 import { json } from '@sveltejs/kit';
-import { resetMastery, resetAllMastery } from '$lib/server/services/mastery';
+import { resetAllMastery, resetMastery } from '$lib/server/services/mastery';
 import type { RequestHandler } from './$types';
 
 export const POST: RequestHandler = async ({ request }) => {

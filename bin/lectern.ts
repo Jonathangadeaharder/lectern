@@ -15,7 +15,7 @@ async function doctor(): Promise<void> {
 	let schemaVersion = 'unknown';
 	try {
 		const db = getDb();
-		const row = db.run({
+		const _row = db.run({
 			sql: 'SELECT value FROM __drizzle_migrations ORDER BY created_at DESC LIMIT 1'
 		});
 		schemaVersion = 'applied';

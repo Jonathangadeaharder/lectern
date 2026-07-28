@@ -12,7 +12,12 @@ function shingles(lines: string[]): string[] {
 	if (lines.length < SHINGLE_SIZE) return [];
 	const out: string[] = [];
 	for (let i = 0; i <= lines.length - SHINGLE_SIZE; i++) {
-		out.push(lines.slice(i, i + SHINGLE_SIZE).map(normalize).join('\n'));
+		out.push(
+			lines
+				.slice(i, i + SHINGLE_SIZE)
+				.map(normalize)
+				.join('\n')
+		);
 	}
 	return out;
 }
@@ -40,9 +45,7 @@ export function detectMovedFrom(hunk: Hunk, candidates: CandidateFile[]): MovedF
 
 	const deleted = hunk.lines.filter((l) => l.type === 'del').map((l) => l.content);
 	const intraHunk: CandidateFile[] =
-		deleted.length >= SHINGLE_SIZE
-			? [{ path: hunk.file, content: deleted.join('\n') }]
-			: [];
+		deleted.length >= SHINGLE_SIZE ? [{ path: hunk.file, content: deleted.join('\n') }] : [];
 
 	for (const cand of [...intraHunk, ...candidates]) {
 		const candLines = cand.content.split(/\r?\n/);

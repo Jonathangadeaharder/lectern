@@ -1,14 +1,14 @@
+import { randomUUID } from 'node:crypto';
 import { eq } from 'drizzle-orm';
 import parseDiff from 'parse-diff';
-import { randomUUID } from 'node:crypto';
 import { getDb } from '../../db';
 import { bundles } from '../../db/schema';
 import { isBinary } from './binary';
-import { writeBundle, bundlePath as bundleFilePath } from './bundle';
+import { bundlePath as bundleFilePath, writeBundle } from './bundle';
 import { githubClient } from './github';
 import { gitlabClient } from './gitlab';
 import type { BundleFileEntry, BundleManifest, IngestProgressEvent, PlatformClient } from './types';
-import { parsePrUrl, repoSlug, type ParsedPrUrl } from './url';
+import { parsePrUrl, repoSlug } from './url';
 
 export class IngestionAuthError extends Error {
 	constructor(public readonly platform: 'github' | 'gitlab') {

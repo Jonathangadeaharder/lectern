@@ -1,6 +1,6 @@
-import type { PlatformClient, PrMetadata, PrCommit } from './types';
-import type { ParsedPrUrl } from './url';
 import { getKey } from '../secrets/keychain';
+import type { PlatformClient, PrMetadata } from './types';
+import type { ParsedPrUrl } from './url';
 
 function envVarForHost(host: string): string {
 	const safe = host.toUpperCase().replace(/[^A-Z0-9]/g, '_');
@@ -50,9 +50,9 @@ export const gitlabClient: PlatformClient = {
 			signal
 		);
 		const data = (await res.json()) as Record<string, unknown>;
-		const stateStr = String(data['state'] ?? 'opened');
+		const stateStr = String(data.state ?? 'opened');
 		const state: PrMetadata['state'] =
-			data['draft'] === true
+			data.draft === true
 				? 'draft'
 				: stateStr === 'merged'
 					? 'merged'
@@ -60,16 +60,16 @@ export const gitlabClient: PlatformClient = {
 						? 'closed'
 						: 'open';
 		return {
-			title: String(data['title'] ?? ''),
-			body: String(data['description'] ?? ''),
-			author: String((data['author'] as Record<string, unknown>)?.['username'] ?? 'unknown'),
+			title: String(data.title ?? ''),
+			body: String(data.description ?? ''),
+			author: String((data.author as Record<string, unknown>)?.username ?? 'unknown'),
 			state,
-			headSha: String(((data['diff_refs'] as Record<string, unknown>) ?? {})['head_sha'] ?? ''),
-			baseSha: String(((data['diff_refs'] as Record<string, unknown>) ?? {})['base_sha'] ?? ''),
-			headRef: String(data['source_branch'] ?? ''),
-			baseRef: String(data['target_branch'] ?? ''),
-			createdAt: String(data['created_at'] ?? ''),
-			updatedAt: String(data['updated_at'] ?? '')
+			headSha: String((data.diff_refs as Record<string, unknown>)?.head_sha ?? ''),
+			baseSha: String((data.diff_refs as Record<string, unknown>)?.base_sha ?? ''),
+			headRef: String(data.source_branch ?? ''),
+			baseRef: String(data.target_branch ?? ''),
+			createdAt: String(data.created_at ?? ''),
+			updatedAt: String(data.updated_at ?? '')
 		};
 	},
 
@@ -94,10 +94,10 @@ export const gitlabClient: PlatformClient = {
 		);
 		const data = (await res.json()) as Array<Record<string, unknown>>;
 		return data.map((c) => ({
-			sha: String(c['id'] ?? ''),
-			message: String(c['message'] ?? ''),
-			author: String(c['author_name'] ?? 'unknown'),
-			date: String(c['created_at'] ?? '')
+			sha: String(c.id ?? ''),
+			message: String(c.message ?? ''),
+			author: String(c.author_name ?? 'unknown'),
+			date: String(c.created_at ?? '')
 		}));
 	},
 

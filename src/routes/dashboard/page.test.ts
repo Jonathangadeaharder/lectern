@@ -1,7 +1,12 @@
-import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/svelte';
+import { describe, expect, it } from 'vitest';
+import type {
+	CalibrationPoint,
+	RecentSession,
+	RepoCard,
+	SkillGridItem
+} from '$lib/server/services/dashboard';
 import Dashboard from './+page.svelte';
-import type { SkillGridItem, RepoCard, RecentSession, CalibrationPoint } from '$lib/server/services/dashboard';
 
 function payload(over: Record<string, unknown> = {}) {
 	return {

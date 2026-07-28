@@ -1,6 +1,6 @@
-import { recordHeartbeat } from '$lib/server/services/session';
-import { error, json } from '@sveltejs/kit';
 import type { RequestEvent } from '@sveltejs/kit';
+import { error, json } from '@sveltejs/kit';
+import { recordHeartbeat } from '$lib/server/services/session';
 
 export async function POST({ params }: RequestEvent) {
 	const id = params.id;
