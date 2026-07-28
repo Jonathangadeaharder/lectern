@@ -12,7 +12,8 @@ const IMPORT_RELATIVE_RE =
 function extractLanguage(path: string): string {
 	const m = LANG_RE.exec(path);
 	if (!m) return 'unknown';
-	const ext = m[1]!.toLowerCase();
+	const ext = m[1]?.toLowerCase();
+	if (!ext) return 'unknown';
 	const map: Record<string, string> = {
 		ts: 'typescript',
 		tsx: 'typescript',
