@@ -111,7 +111,15 @@ export async function gradeAnswer(args: GradeArgs): Promise<GradingResult> {
 			throw new Error(`unsupported format: ${question.format}`);
 	}
 
-	persistAnswer(args, final);
+	persistAnswer(
+		{
+			sessionId: args.sessionId,
+			questionId: args.questionId,
+			payload: args.payload,
+			format: question.format
+		},
+		final
+	);
 	return final;
 }
 
@@ -175,7 +183,12 @@ export async function* streamGradeFreeText(args: {
 	};
 
 	persistAnswer(
-		{ sessionId: args.sessionId, questionId: args.questionId, payload: { answer: args.answer } },
+		{
+			sessionId: args.sessionId,
+			questionId: args.questionId,
+			payload: { answer: args.answer },
+			format: question.format
+		},
 		result
 	);
 	yield { final: result };
@@ -413,7 +426,12 @@ function loadQuestion(questionId: string): { question: Question; rubric: Rubric 
 }
 
 function persistAnswer(
-	args: { sessionId: string; questionId: string; payload: AnswerPayload },
+	args: {
+		sessionId: string;
+		questionId: string;
+		payload: AnswerPayload;
+		format: Question['format'];
+	},
 	result: GradingResult
 ): void {
 	const db = getDb();
@@ -424,7 +442,7 @@ function persistAnswer(
 				id: randomUUID(),
 				sessionId: args.sessionId,
 				questionId: args.questionId,
-				format: 'unknown',
+				format: args.format,
 				payloadJson: JSON.stringify(args.payload),
 				gradingJson: JSON.stringify(result),
 				rawScore: result.rawScore,
