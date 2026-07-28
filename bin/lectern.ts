@@ -66,6 +66,12 @@ async function doctor(): Promise<void> {
 		keychainBackend = isFallbackActive() ? 'encrypted-file-fallback' : 'unavailable';
 	}
 	console.log(`  Keychain backend : ${keychainBackend}`);
+	if (keychainBackend === 'encrypted-file-fallback') {
+		console.log('  WARNING: keychain fallback active — secrets are stored in a');
+		console.log('  machine-bound encrypted file (key derived from machine-id), not the');
+		console.log('  OS keychain. This guards against disk theft only, not other local');
+		console.log('  users. Install libsecret (Linux) to use the OS keychain instead.');
+	}
 
 	console.log('');
 }
