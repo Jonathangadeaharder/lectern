@@ -30,8 +30,8 @@ describe('Icon', () => {
 		const { container } = render(Icon, { name });
 		const svg = container.querySelector('svg');
 		expect(svg).toBeInTheDocument();
-		const shapes = svg!.querySelectorAll('path, circle, line, polyline, polygon, rect');
-		expect(shapes.length).toBeGreaterThan(0);
+		const shapes = svg?.querySelectorAll('path, circle, line, polyline, polygon, rect');
+		expect(shapes?.length ?? 0).toBeGreaterThan(0);
 	});
 
 	it('renders 16x16 by default', () => {
