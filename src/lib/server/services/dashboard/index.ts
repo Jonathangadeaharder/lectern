@@ -104,7 +104,7 @@ export function getDashboardData(days = 90): DashboardData {
 			totalSessions: rc.totalSessions,
 			avgScore: rc.avgScore,
 			lastSessionAt: rc.lastSessionAt,
-			topWeakTag: weakSpots.length > 0 ? weakSpots[0]!.tag : null
+			topWeakTag: weakSpots[0]?.tag ?? null
 		};
 	});
 
