@@ -11,3 +11,5 @@ tsconfig.json
 **/*.map
 node_modules/**
 out.before-*/**
+tools/**
+*.vsix

@@ -45,7 +45,9 @@ export class InboxNode extends vscode.TreeItem {
                 : vscode.TreeItemCollapsibleState.None,
         );
         if (kind === "mr" && mr) {
-            this.id = `mr:${mr.id}`;
+            // ponytail: dropped this.id = `mr:${mr.id}`. VS Code appears to
+            // occasionally treat item.id as part of command routing, producing
+            // "command not found: lectern.openPanel /4" errors.
             this.contextValue = "mr";
             this.description = mr.state === "draft" ? "draft" : "";
             this.tooltip = `!${mr.id} · ${mr.projectPath}\n${mr.title}\nupdated ${mr.updatedAt}`;

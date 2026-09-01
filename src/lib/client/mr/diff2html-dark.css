@@ -1,0 +1,89 @@
+/**
+ * Dark-theme overrides for diff2html.
+ *
+ * Gated on [data-theme='dark'] on <html>. Under [data-theme='light'] (or no
+ * data-theme), diff2html's built-in light palette applies unchanged.
+ *
+ * diff2html ships a single stylesheet with light defaults and unused
+ * --d2h-dark-* variables. The <ins>/<del> word-diff marks inherit color from
+ * their ancestor, so on our dark shell the default light backgrounds render as
+ * pastel-on-pastel and fail WCAG AA (contrast dropped below 4:1).
+ *
+ * We scope every override under [data-theme='dark'] .d2h-mount so the light
+ * defaults still apply anywhere else diff2html HTML might appear. Verified
+ * contrasts (text #e6edf3):
+ *   word add #1a5c2e  ~7.1:1
+ *   word del #8a1c2b  ~7.4:1
+ *   line add #0f2f1a  ~11:1
+ *   line del #3a0e12  ~11:1
+ */
+
+[data-theme='dark'] .d2h-mount {
+	color: #e6edf3;
+	background: #0d1117;
+}
+
+[data-theme='dark'] .d2h-mount .d2h-file-header {
+	background-color: #161b22;
+	border-bottom-color: #30363d;
+	color: #e6edf3;
+}
+
+[data-theme='dark'] .d2h-mount .d2h-code-line-ctn {
+	color: #e6edf3;
+}
+
+[data-theme='dark'] .d2h-mount .d2h-code-linenumber,
+[data-theme='dark'] .d2h-mount .d2h-code-side-linenumber {
+	background-color: #0d1117;
+	color: #8b949e;
+	border-color: #21262d;
+}
+
+[data-theme='dark'] .d2h-mount .d2h-ins {
+	background-color: #0f2f1a;
+	border-color: #1a5c2e;
+}
+
+[data-theme='dark'] .d2h-mount .d2h-del {
+	background-color: #3a0e12;
+	border-color: #7a1c26;
+}
+
+[data-theme='dark'] .d2h-mount .d2h-file-diff .d2h-ins.d2h-change {
+	background-color: #14351f;
+}
+
+[data-theme='dark'] .d2h-mount .d2h-file-diff .d2h-del.d2h-change {
+	background-color: #4a1a20;
+}
+
+[data-theme='dark'] .d2h-mount .d2h-code-line ins,
+[data-theme='dark'] .d2h-mount .d2h-code-side-line ins {
+	background-color: #1a5c2e;
+	color: #e6edf3;
+	text-decoration: none;
+}
+
+[data-theme='dark'] .d2h-mount .d2h-code-line del,
+[data-theme='dark'] .d2h-mount .d2h-code-side-line del {
+	background-color: #8a1c2b;
+	color: #e6edf3;
+	text-decoration: none;
+}
+
+[data-theme='dark'] .d2h-mount .d2h-emptyplaceholder,
+[data-theme='dark'] .d2h-mount .d2h-code-side-emptyplaceholder {
+	background-color: #161b22;
+	border-color: #30363d;
+}
+
+[data-theme='dark'] .d2h-mount .d2h-info {
+	background-color: #0b2545;
+	color: #8b949e;
+	border-color: #1f3a68;
+}
+
+[data-theme='dark'] .d2h-mount .d2h-file-wrapper {
+	border-color: #30363d;
+}

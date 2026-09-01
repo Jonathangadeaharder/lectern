@@ -5,6 +5,7 @@ import * as path from "node:path";
 import {
     ActiveTarget,
     basePath,
+    canonicalPrRef,
     lecternRoot,
     readLastOpened,
     repoShaFromPath,
@@ -14,7 +15,14 @@ import { getOutputChannel, startLogTail } from "./output";
 import { createWatcher, WatcherHandle } from "./watcher";
 import { envVarForGitlabHost } from "./inbox/gitlab";
 import { InboxTreeProvider, type InboxMr } from "./views/inboxTree";
-import { openPanelForMr, openPanelForE2E, currentPanel } from "./views/panel";
+import {
+    openPanelForMr,
+    openPanelForE2E,
+    currentPanel,
+    refreshActiveBundle,
+    flushMutationQuizProgress,
+    flushReviewState,
+} from "./views/panel";
 import { startReviewComments } from "./review-comments";
 
 let watcher: WatcherHandle | undefined;
@@ -24,6 +32,24 @@ let inbox: InboxTreeProvider | undefined;
 let reviewComments: vscode.Disposable | undefined;
 let extensionContext: vscode.ExtensionContext | undefined;
 let tokenStatusItem: vscode.StatusBarItem | undefined;
+
+// Reports the size of the workspace state DB this extension persists into, because a bloated
+// state.vscdb makes VS Code's own storage commits collide and abort the main process.
+function logWorkspaceStateSize(context: vscode.ExtensionContext): void {
+    const storage = context.storageUri;
+    if (!storage) return;
+    const db = path.join(path.dirname(storage.fsPath), "state.vscdb");
+    void fs.stat(db).then(
+        (st) => {
+            const mib = st.size / 1048576;
+            const line = `[state] workspace state.vscdb ${mib.toFixed(1)}MiB (${db})`;
+            getOutputChannel().appendLine(mib > 50 ? `${line} BLOATED, vacuum it` : line);
+        },
+        () => {
+            /* not present on first activation in a workspace */
+        },
+    );
+}
 
 function getHost(): string {
     return vscode.workspace
@@ -60,6 +86,7 @@ function currentGitBranch(repoPath: string): Promise<string | null> {
             const p = spawn("git", ["rev-parse", "--abbrev-ref", "HEAD"], {
                 cwd: repoPath,
                 shell: false,
+                windowsHide: true,
             });
             let out = "";
             p.stdout.on("data", (b) => (out += b.toString()));
@@ -82,6 +109,7 @@ function applyTarget(target: ActiveTarget | null): void {
             watcher.rebase(target.base);
         } else {
             watcher = createWatcher(target.base);
+            watcher.onChange(() => refreshActiveBundle());
         }
         logTail?.dispose();
         logTail = startLogTail(target.base);
@@ -109,6 +137,7 @@ async function listPrRefsForRepo(repoSha: string): Promise<string[]> {
 
 export function activate(context: vscode.ExtensionContext): void {
     extensionContext = context;
+    logWorkspaceStateSize(context);
 
     inbox = new InboxTreeProvider(context, getHost());
 
@@ -145,11 +174,12 @@ export function activate(context: vscode.ExtensionContext): void {
             const ws = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
             if (ws) {
                 const repoSha = repoShaFromPath(ws);
+                const prRef = canonicalPrRef(asMr.id);
                 const t: ActiveTarget = {
                     repoSha,
                     repoPath: ws,
-                    prRef: String(asMr.id),
-                    base: basePath(repoSha, String(asMr.id)),
+                    prRef,
+                    base: basePath(repoSha, prRef),
                 };
                 void writeLastOpened(t);
                 applyTarget(t);
@@ -221,11 +251,12 @@ export function activate(context: vscode.ExtensionContext): void {
                 context,
             );
             const repoSha = repoShaFromPath(ws);
+            const prRef = canonicalPrRef(id);
             const t: ActiveTarget = {
                 repoSha,
                 repoPath: ws,
-                prRef: String(id),
-                base: basePath(repoSha, String(id)),
+                prRef,
+                base: basePath(repoSha, prRef),
             };
             await writeLastOpened(t);
             applyTarget(t);
@@ -244,11 +275,6 @@ export function activate(context: vscode.ExtensionContext): void {
             const panel = currentPanel();
             getOutputChannel().appendLine(`[showView] panel=${panel ? 'yes' : 'no'}`);
             if (panel) await panel.webview.postMessage({ type: "navigate", view: "review" });
-        }),
-        vscode.commands.registerCommand("lectern.showDiff", async () => {
-            const panel = currentPanel();
-            getOutputChannel().appendLine(`[showView] panel=${panel ? 'yes' : 'no'}`);
-            if (panel) await panel.webview.postMessage({ type: "navigate", view: "diff" });
         }),
         vscode.commands.registerCommand("lectern.refresh", () => {
             inbox?.refresh();
@@ -346,6 +372,42 @@ export function activate(context: vscode.ExtensionContext): void {
                             }
                         });
                         void panel.webview.postMessage({ type: "e2e:setView", view });
+                    });
+                }),
+                vscode.commands.registerCommand("lectern.e2e.mutationAction", async (action: string) => {
+                    const panel = currentPanel();
+                    if (!panel) return { error: "no-panel" };
+                    return await new Promise((resolve) => {
+                        const timer = setTimeout(() => {
+                            sub.dispose();
+                            resolve({ error: "timeout", action });
+                        }, action === "complete" ? 15000 : 3000);
+                        const sub = panel.webview.onDidReceiveMessage((m: { type?: string; action?: string }) => {
+                            if (m?.type === "e2e:mutationAction:ack" && m.action === action) {
+                                clearTimeout(timer);
+                                sub.dispose();
+                                resolve(m);
+                            }
+                        });
+                        void panel.webview.postMessage({ type: "e2e:mutationAction", action });
+                    });
+                }),
+                vscode.commands.registerCommand("lectern.e2e.reviewAction", async (action: string) => {
+                    const panel = currentPanel();
+                    if (!panel) return { error: "no-panel" };
+                    return await new Promise((resolve) => {
+                        const timer = setTimeout(() => {
+                            sub.dispose();
+                            resolve({ error: "timeout", action });
+                        }, 3000);
+                        const sub = panel.webview.onDidReceiveMessage((m: { type?: string; action?: string }) => {
+                            if (m?.type === "e2e:reviewAction:ack" && m.action === action) {
+                                clearTimeout(timer);
+                                sub.dispose();
+                                resolve(m);
+                            }
+                        });
+                        void panel.webview.postMessage({ type: "e2e:reviewAction", action });
                     });
                 }),
             ]
@@ -450,7 +512,29 @@ async function runE2EAutoScript(context: vscode.ExtensionContext): Promise<void>
     const dump = () => vscode.commands.executeCommand("lectern.e2e.dump");
     const setView = (view: "slides" | "quiz" | "review") =>
         vscode.commands.executeCommand("lectern.e2e.setView", view);
+    const reviewAction = (action: string) =>
+        vscode.commands.executeCommand("lectern.e2e.reviewAction", action);
+    const mutationAction = (action: string) =>
+        vscode.commands.executeCommand("lectern.e2e.mutationAction", action);
     const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+    const waitForInit = async (): Promise<unknown> => {
+        const deadline = Date.now() + 5000;
+        while (Date.now() < deadline) {
+            const state = await dump() as { initReady?: boolean } | undefined;
+            if (state?.initReady) return state;
+            await sleep(100);
+        }
+        return dump();
+    };
+    const waitForRefresh = async (): Promise<unknown> => {
+        const deadline = Date.now() + 5000;
+        while (Date.now() < deadline) {
+            const state = await dump() as { refreshMrDisabled?: boolean } | undefined;
+            if (state?.refreshMrDisabled === false) return state;
+            await sleep(100);
+        }
+        return dump();
+    };
     const CHECKPOINT_DIR = process.env.LECTERN_E2E_CHECKPOINT_DIR ?? "";
     const checkpoint = async (name: string) => {
         if (!CHECKPOINT_DIR) return;
@@ -484,6 +568,11 @@ async function runE2EAutoScript(context: vscode.ExtensionContext): Promise<void>
         }
     };
     try {
+        await Promise.all(
+            context.workspaceState.keys()
+                .filter((key) => key.startsWith("lectern.mr.review.v") || key.startsWith("lectern.mr.mutation-quiz.v"))
+                .map((key) => context.workspaceState.update(key, undefined)),
+        );
         // Copilot sign-in / welcome opens ~800ms into the session. Poll for
         // 3s closing the shell in every 200ms tick so no walkthrough sneaks
         // in after our first sweep.
@@ -498,7 +587,7 @@ async function runE2EAutoScript(context: vscode.ExtensionContext): Promise<void>
             webUrl: "https://git.cgm.ag/cgm.de.ais.turbomed/turbomed/sources/-/merge_requests/6532",
         });
         await sleep(600);
-        record("panel.opened", await dump());
+        record("panel.opened", await waitForInit());
         await checkpoint("00-opened");
 
         for (const view of ["slides", "quiz", "review"] as const) {
@@ -506,7 +595,55 @@ async function runE2EAutoScript(context: vscode.ExtensionContext): Promise<void>
             await sleep(400);
             record(`view.${view}`, await dump());
             await checkpoint(`10-${view}`);
+            if (view === "quiz") {
+                await mutationAction("choose-live");
+                await sleep(200);
+                record("quiz.mutationWrong", await dump());
+                await checkpoint("11-quiz-mutation-wrong");
+
+                await mutationAction("choose-mutant");
+                await sleep(200);
+                record("quiz.mutationSolved", await dump());
+                await checkpoint("12-quiz-mutation-solved");
+
+                await mutationAction("complete");
+                await sleep(200);
+                record("quiz.mutationComplete", await dump());
+                await checkpoint("13-quiz-mutation-complete");
+            }
         }
+        await reviewAction("collapse-file");
+        await reviewAction("collapse-threads");
+        await sleep(200);
+        record("review.railsCollapsed", await dump());
+        await checkpoint("20-review-rails-collapsed");
+
+        await reviewAction("reopen-file");
+        await reviewAction("reopen-threads");
+        await reviewAction("review-first-file");
+        await sleep(200);
+        record("review.progressSet", await dump());
+        await checkpoint("30-review-progress");
+
+        await reviewAction("refresh-mr");
+        record("review.progressRefreshed", await waitForRefresh());
+        await checkpoint("35-review-refreshed");
+
+        currentPanel()?.dispose();
+        await vscode.commands.executeCommand("lectern.e2e.openFakeMr", {
+            id: 6532,
+            projectPath: "cgm.de.ais.turbomed/turbomed/sources",
+            base: bundleBase || undefined,
+            webUrl: "https://git.cgm.ag/cgm.de.ais.turbomed/turbomed/sources/-/merge_requests/6532",
+        });
+        await sleep(600);
+        record("review.progressRestored", await waitForInit());
+        await checkpoint("40-review-progress-restored");
+
+        await setView("quiz");
+        await sleep(300);
+        record("quiz.mutationRestored", await dump());
+        await checkpoint("45-quiz-mutation-restored");
         const summary = {
             ok: steps.every((s) => {
                 const p = s.payload as { error?: string } | null;
@@ -540,6 +677,8 @@ async function runE2EAutoScript(context: vscode.ExtensionContext): Promise<void>
 }
 
 export function deactivate(): void {
+    try { void flushMutationQuizProgress("deactivate"); } catch { /* ignore */ }
+    try { void flushReviewState("deactivate"); } catch { /* ignore */ }
     try { logTail?.dispose(); } catch { /* ignore */ }
     try { watcher?.dispose(); } catch { /* ignore */ }
     try { reviewComments?.dispose(); } catch { /* ignore */ }

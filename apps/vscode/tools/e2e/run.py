@@ -49,9 +49,7 @@ def find_code() -> str:
 
 
 def _find_vscode_hwnd() -> int | None:
-    """Enumerate top-level windows, return the hwnd whose title contains our
-    fake MR marker '!6532' (set via openPanelForE2E). Falls back to any
-    'Visual Studio Code' window if no marker match. Windows only."""
+    """Return the VS Code window whose title contains the fake MR marker."""
     import ctypes
     import ctypes.wintypes as wt
 
@@ -68,15 +66,14 @@ def _find_vscode_hwnd() -> int | None:
         buf = ctypes.create_unicode_buffer(length + 1)
         user32.GetWindowTextW(hwnd, buf, length + 1)
         title = buf.value
-        if "!6532" in title or "Visual Studio Code" in title:
+        if "!6532" in title:
             matches.append((hwnd, title))
         return True
 
     user32.EnumWindows(_enum, 0)
     if not matches:
         return None
-    marker = [m for m in matches if "!6532" in m[1]]
-    return (marker or matches)[0][0]
+    return matches[0][0]
 
 
 def _bring_to_front(hwnd: int) -> None:
@@ -145,30 +142,30 @@ def _window_rect(hwnd: int) -> tuple[int, int, int, int]:
     return rect.left, rect.top, rect.right, rect.bottom
 
 
-def screenshot(path: Path) -> None:
+def screenshot(path: Path, width: int, height: int) -> None:
     import mss
     from PIL import Image
     import time as _time
 
+    deadline = time.time() + 5
     hwnd = _find_vscode_hwnd()
+    while hwnd is None and time.time() < deadline:
+        time.sleep(0.1)
+        hwnd = _find_vscode_hwnd()
+    if hwnd is None:
+        raise RuntimeError("E2E VS Code window !6532 was not found")
     with mss.MSS() as sct:
-        if hwnd:
-            _fix_geometry(hwnd)
-            _bring_to_front(hwnd)
-            _time.sleep(0.2)
-            # Dismiss the Copilot sign-in walkthrough that VS Code opens on
-            # every fresh user-data-dir. Click its 'x' close button then send
-            # escape as a backup for any transient notification.
-            _dismiss_copilot_signin(hwnd)
-            for _ in range(3):
-                _send_escape()
-                _time.sleep(0.08)
-            _time.sleep(0.35)
-            left, top, right, bottom = _window_rect(hwnd)
-            width, height = max(1, right - left), max(1, bottom - top)
-            mon = {"left": left, "top": top, "width": width, "height": height}
-        else:
-            mon = sct.monitors[1]
+        _fix_geometry(hwnd, width, height)
+        _bring_to_front(hwnd)
+        _time.sleep(0.2)
+        _dismiss_copilot_signin(hwnd)
+        for _ in range(3):
+            _send_escape()
+            _time.sleep(0.08)
+        _time.sleep(0.35)
+        left, top, right, bottom = _window_rect(hwnd)
+        width, height = max(1, right - left), max(1, bottom - top)
+        mon = {"left": left, "top": top, "width": width, "height": height}
         img = sct.grab(mon)
         Image.frombytes("RGB", img.size, img.rgb).save(path)
 
@@ -189,7 +186,13 @@ def ssim_ok(a: Path, b: Path, threshold: float) -> tuple[bool, float]:
     return score >= threshold, score
 
 
-def wait_for_report(report: Path, timeout_s: float, checkpoint_dir: Path) -> dict:
+def wait_for_report(
+    report: Path,
+    timeout_s: float,
+    checkpoint_dir: Path,
+    width: int,
+    height: int,
+) -> dict:
     deadline = time.time() + timeout_s
     seen: set[str] = set()
     while time.time() < deadline:
@@ -205,7 +208,7 @@ def wait_for_report(report: Path, timeout_s: float, checkpoint_dir: Path) -> dic
                     tag = f.stem
                     time.sleep(0.15)
                     ARTIFACTS.mkdir(parents=True, exist_ok=True)
-                    screenshot(ARTIFACTS / f"{tag}.png")
+                    screenshot(ARTIFACTS / f"{tag}.png", width, height)
                     print(f"[e2e] captured {tag}.png")
                     try:
                         f.unlink()
@@ -239,9 +242,63 @@ def assert_report(report: dict) -> list[str]:
     vq = by_name.get("view.quiz") or {}
     if vq.get("activeTabLabels") != ["Quiz"]:
         problems.append(f"view.quiz active tab: {vq.get('activeTabLabels')}")
+    if not vq.get("mutationQuizPresent"):
+        problems.append("view.quiz does not contain the mutation quiz surface")
+    if vq.get("mutationCandidateCount") != 2:
+        problems.append(f"view.quiz mutation candidates: {vq.get('mutationCandidateCount')}")
+    mutation_wrong = by_name.get("quiz.mutationWrong") or {}
+    if not str(mutation_wrong.get("mutationResultText", "")).startswith("Not this one."):
+        problems.append(f"quiz.mutationWrong feedback: {mutation_wrong.get('mutationResultText')}")
+    if mutation_wrong.get("mutationNextPresent"):
+        problems.append("quiz.mutationWrong exposes the next action")
+    if mutation_wrong.get("surfaceClientWidth") != vq.get("surfaceClientWidth"):
+        problems.append(
+            f"quiz.mutationWrong shifted width: {vq.get('surfaceClientWidth')} -> {mutation_wrong.get('surfaceClientWidth')}"
+        )
+    mutation_solved = by_name.get("quiz.mutationSolved") or {}
+    if sorted(mutation_solved.get("mutationStatusLabels", [])) != ["Injected mutation", "Live patch"]:
+        problems.append(f"quiz.mutationSolved labels: {mutation_solved.get('mutationStatusLabels')}")
+    if not mutation_solved.get("mutationNextPresent"):
+        problems.append("quiz.mutationSolved is missing the next action")
+    if mutation_solved.get("surfaceClientWidth") != vq.get("surfaceClientWidth"):
+        problems.append(
+            f"quiz.mutationSolved shifted width: {vq.get('surfaceClientWidth')} -> {mutation_solved.get('surfaceClientWidth')}"
+        )
+    mutation_complete = by_name.get("quiz.mutationComplete") or {}
+    if not mutation_complete.get("mutationCompletePresent"):
+        problems.append("quiz.mutationComplete is missing the completion surface")
+    if not str(mutation_complete.get("mutationCompletionHeading", "")).startswith("All "):
+        problems.append(f"quiz.mutationComplete heading: {mutation_complete.get('mutationCompletionHeading')}")
+    if len(mutation_complete.get("mutationCompletionStats", [])) != 3:
+        problems.append(f"quiz.mutationComplete stats: {mutation_complete.get('mutationCompletionStats')}")
     vr = by_name.get("view.review") or {}
     if vr.get("activeTabLabels") != ["Review"]:
         problems.append(f"view.review active tab: {vr.get('activeTabLabels')}")
+    if not vr.get("structuralReviewPresent"):
+        problems.append("view.review does not contain the structural review surface")
+    collapsed = by_name.get("review.railsCollapsed") or {}
+    if collapsed.get("fileRailPresent") or collapsed.get("threadRailPresent"):
+        problems.append("review.railsCollapsed still contains an open rail")
+    if not collapsed.get("showFileRailPresent") or not collapsed.get("showThreadRailPresent"):
+        problems.append("review.railsCollapsed is missing a reopen control")
+    progress = by_name.get("review.progressSet") or {}
+    if not str(progress.get("footerProgressText", "")).startswith("1 /"):
+        problems.append(f"review.progressSet footer did not advance: {progress.get('footerProgressText')}")
+    refreshed = by_name.get("review.progressRefreshed") or {}
+    if refreshed.get("footerProgressText") != progress.get("footerProgressText"):
+        problems.append(
+            f"review progress did not survive refresh: {progress.get('footerProgressText')} -> {refreshed.get('footerProgressText')}"
+        )
+    if not refreshed.get("refreshMrPresent") or refreshed.get("refreshMrDisabled"):
+        problems.append(f"refresh control did not settle: {refreshed}")
+    restored = by_name.get("review.progressRestored") or {}
+    if restored.get("footerProgressText") != progress.get("footerProgressText"):
+        problems.append(
+            f"review progress was not restored: {progress.get('footerProgressText')} -> {restored.get('footerProgressText')}"
+        )
+    mutation_restored = by_name.get("quiz.mutationRestored") or {}
+    if not mutation_restored.get("mutationCompletePresent"):
+        problems.append("quiz.mutationRestored did not preserve completion")
     return problems
 
 
@@ -274,6 +331,8 @@ def main() -> int:
     ap.add_argument("--update-baselines", action="store_true")
     ap.add_argument("--ssim", type=float, default=0.95)
     ap.add_argument("--timeout", type=float, default=90.0)
+    ap.add_argument("--width", type=int, default=1400)
+    ap.add_argument("--height", type=int, default=900)
     ap.add_argument("--keep-open", action="store_true", help="Don't auto-close VS Code")
     args = ap.parse_args()
 
@@ -354,7 +413,13 @@ def main() -> int:
     print(f"[e2e] launching: {cmd[0]} ...")
     proc = subprocess.Popen(cmd, env=env)
     try:
-        report_data = wait_for_report(report, args.timeout, checkpoint_dir)
+        report_data = wait_for_report(
+            report,
+            args.timeout,
+            checkpoint_dir,
+            args.width,
+            args.height,
+        )
     finally:
         if not args.keep_open:
             try:

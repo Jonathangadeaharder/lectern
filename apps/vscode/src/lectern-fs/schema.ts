@@ -35,6 +35,8 @@ export const MetaSchema = z.object({
 	branch: z.string().optional(),
 	baseBranch: z.string().optional(),
 	author: z.string().optional(),
+	baseSha: z.string().regex(/^[0-9a-f]{40}$/).optional(),
+	headSha: z.string().regex(/^[0-9a-f]{40}$/).optional(),
 	createdAt: z.string().datetime(),
 	updatedAt: z.string().datetime(),
 	decks: z
@@ -106,7 +108,7 @@ export const QuizAnswerFileSchema = z.object({
 export const SessionStateSchema = z.object({
 	version: z.literal(FORMAT_VERSION),
 	openedAt: z.string().datetime(),
-	currentView: z.enum(['slides', 'quiz', 'review']),
+	currentView: z.enum(['slides', 'quiz', 'review', 'diff']),
 	currentSlide: z.number().int().nonnegative().default(0),
 	currentQuestion: z.string().nullable().default(null),
 	quizCursor: z
@@ -115,7 +117,16 @@ export const SessionStateSchema = z.object({
 			skipped: z.array(z.string())
 		})
 		.default({ answered: [], skipped: [] }),
-	lastSkillInvocation: z.string().datetime().optional()
+	lastSkillInvocation: z.string().datetime().optional(),
+	diffFilters: z.record(z.string(), z.boolean()).default({}),
+	diffFileOverrides: z.array(z.string()).default([]),
+	diffSearch: z
+		.object({
+			pattern: z.string().default(''),
+			kind: z.enum(['glob', 'regex']).default('glob')
+		})
+		.default({ pattern: '', kind: 'glob' }),
+	diffCollapsedFiles: z.array(z.string()).default([])
 });
 
 export const LogEntrySchema = z

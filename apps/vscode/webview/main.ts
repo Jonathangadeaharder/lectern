@@ -1,5 +1,6 @@
 import { mount } from 'svelte';
 import App from './App.svelte';
+import '../../../src/lib/styles/tokens.css';
 
 declare function acquireVsCodeApi(): {
 	postMessage(msg: unknown): void;
@@ -12,6 +13,18 @@ const vscode = acquireVsCodeApi();
 // without prop-drilling. acquireVsCodeApi() may only be called once per webview;
 // any component that needs it reads __lecternVscode instead of calling again.
 (window as unknown as { __lecternVscode: typeof vscode }).__lecternVscode = vscode;
+
+function syncTheme(): void {
+	document.documentElement.dataset.theme = document.body.classList.contains('vscode-light')
+		? 'light'
+		: 'dark';
+}
+
+syncTheme();
+new MutationObserver(syncTheme).observe(document.body, {
+	attributes: true,
+	attributeFilter: ['class']
+});
 
 const target = document.getElementById('app');
 if (!target) throw new Error('lectern: #app root missing in webview shell');

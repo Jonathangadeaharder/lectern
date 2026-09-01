@@ -31,6 +31,7 @@ import {
 	type SlideFrontmatter,
 	SlideFrontmatterSchema
 } from './schema';
+import { FilterSpecSchema, type FilterSpec } from './diff-filters-schema';
 
 export class PathError extends Error {
 	constructor(message: string) {
@@ -173,6 +174,21 @@ function coerceScalar(s: string): unknown {
 	return t;
 }
 
+function errorMessage(error: unknown): string {
+	return error instanceof Error ? error.message : String(error);
+}
+
+function throwContentErrors(kind: string, errors: string[]): void {
+	if (errors.length === 0) return;
+	throw new Error(`invalid ${kind}:\n${errors.map((error) => `- ${error}`).join('\n')}`);
+}
+
+function deckLevel(kind: SlideFrontmatter['kind']): 'high' | 'mid' | 'low' {
+	if (kind === 'tldr' || kind === 'risk' || kind === 'open_question') return 'high';
+	if (kind === 'decision' || kind === 'test') return 'mid';
+	return 'low';
+}
+
 // ---------------------------------------------------------------------------
 // Loaders
 // ---------------------------------------------------------------------------
@@ -229,11 +245,17 @@ export async function loadPresentation(base: string): Promise<PresentationData> 
 	}
 	const mdFiles = entries.filter((e) => e.endsWith('.md')).sort();
 	const slides: PresentationSlide[] = [];
+	const errors: string[] = [];
 	for (const name of mdFiles) {
 		const path = join(slidesDir, name);
 		try {
+			const filename = /^(\d{3})-[a-z0-9]+(?:-[a-z0-9]+)*\.md$/.exec(name);
+			if (!filename) throw new Error('filename must be NNN-kebab-slug.md');
 			const text = await readFile(path, 'utf8');
 			const { frontmatter, body } = parseSlideFile(text);
+			if (frontmatter.position !== Number(filename[1])) {
+				throw new Error(`position ${frontmatter.position} does not match filename ${filename[1]}`);
+			}
 			const renderedBody = await renderPlantumlFences(body, base);
 			slides.push({
 				position: frontmatter.position,
@@ -246,12 +268,26 @@ export async function loadPresentation(base: string): Promise<PresentationData> 
 				body: renderedBody
 			});
 		} catch (err) {
-			console.warn(
-				`[lectern-fs] skipping slide ${path}: ${err instanceof Error ? err.message : String(err)}`
-			);
+			errors.push(`${name}: ${errorMessage(err)}`);
 		}
 	}
 	slides.sort((a, b) => a.position - b.position);
+	const positions = slides.map((slide) => slide.position);
+	if (new Set(positions).size !== positions.length) errors.push('slide positions must be unique');
+	if (slides.filter((slide) => slide.kind === 'tldr').length > 1) errors.push('at most one tldr slide is allowed');
+	if (slides.filter((slide) => slide.kind === 'appendix').length > 1) errors.push('at most one appendix slide is allowed');
+	if (slides.filter((slide) => slide.severity === 'critical').length > 1) errors.push('at most one critical slide is allowed');
+	const actualDecks = {
+		high: slides.filter((slide) => deckLevel(slide.kind) === 'high').length,
+		mid: slides.filter((slide) => deckLevel(slide.kind) === 'mid').length,
+		low: slides.filter((slide) => deckLevel(slide.kind) === 'low').length
+	};
+	if (actualDecks.high !== meta.decks.high || actualDecks.mid !== meta.decks.mid || actualDecks.low !== meta.decks.low) {
+		errors.push(
+			`meta.decks is ${meta.decks.high}/${meta.decks.mid}/${meta.decks.low}, actual kind counts are ${actualDecks.high}/${actualDecks.mid}/${actualDecks.low}`
+		);
+	}
+	throwContentErrors('slide deck', errors);
 	return { meta, slides };
 }
 
@@ -283,7 +319,7 @@ export async function loadQuiz(base: string): Promise<QuizData> {
 				const aText = await readFile(apath, 'utf8');
 				const parsed = QuizAnswerFileSchema.safeParse(JSON.parse(aText));
 				if (parsed.success) {
-					answersById.set(parsed.data.questionId, parsed.data);
+					answersById.set(parsed.data.questionId, parsed.data.answer);
 				} else {
 					console.warn(`[lectern-fs] skipping answer ${apath}: ${parsed.error.message}`);
 				}
@@ -298,28 +334,37 @@ export async function loadQuiz(base: string): Promise<QuizData> {
 	}
 
 	const questions: QuizData['questions'] = [];
+	const errors: string[] = [];
 	for (const name of qFiles) {
 		const path = join(quizDir, name);
 		try {
 			const json = JSON.parse(await readFile(path, 'utf8'));
 			const parsed = QuestionSchema.safeParse(json);
 			if (!parsed.success) {
-				console.warn(`[lectern-fs] skipping question ${path}: ${parsed.error.message}`);
+				errors.push(`${name}: ${parsed.error.message}`);
 				continue;
 			}
 			const q = parsed.data as Record<string, unknown> & { id: string };
+			if (`${q.id}.json` !== name) {
+				errors.push(`${name}: id ${q.id} does not match filename`);
+				continue;
+			}
+			const contextLines = q.contextLines as Array<{ file?: string }> | undefined;
+			if ((contextLines ?? []).some((line) => !line.file?.trim())) {
+				errors.push(`${name}: every context line must name a source file`);
+				continue;
+			}
 			const ans = answersById.get(q.id);
 			if (ans !== undefined) {
 				(q as Record<string, unknown>).userAnswer = ans;
 			}
 			questions.push(q);
 		} catch (err) {
-			console.warn(
-				`[lectern-fs] skipping question ${path}: ${err instanceof Error ? err.message : String(err)}`
-			);
+			errors.push(`${name}: ${errorMessage(err)}`);
 		}
 	}
 	questions.sort((a, b) => String(a.id).localeCompare(String(b.id)));
+	throwContentErrors('quiz', errors);
 	return { meta, questions };
 }
 
@@ -353,10 +398,11 @@ export async function loadReview(base: string): Promise<ReviewData> {
 
 	const findingsDir = join(reviewDir, 'findings');
 	const findings: Finding[] = [];
+	const errors: string[] = [];
 	try {
 		const files = await readdir(findingsDir);
 		for (const name of files) {
-			if (!name.endsWith('.json')) continue;
+			if (!name.endsWith('.json') || name.endsWith('.deleted.json')) continue;
 			const path = join(findingsDir, name);
 			try {
 				const json = JSON.parse(await readFile(path, 'utf8'));
@@ -364,12 +410,10 @@ export async function loadReview(base: string): Promise<ReviewData> {
 				if (parsed.success) {
 					findings.push(parsed.data);
 				} else {
-					console.warn(`[lectern-fs] skipping finding ${path}: ${parsed.error.message}`);
+					errors.push(`${name}: ${parsed.error.message}`);
 				}
 			} catch (err) {
-				console.warn(
-					`[lectern-fs] skipping finding ${path}: ${err instanceof Error ? err.message : String(err)}`
-				);
+				errors.push(`${name}: ${errorMessage(err)}`);
 			}
 		}
 	} catch {
@@ -383,8 +427,63 @@ export async function loadReview(base: string): Promise<ReviewData> {
 		if (p !== 0) return p;
 		return a.line - b.line;
 	});
+	const counts = {
+		critical: findings.filter((finding) => finding.severity === 'critical').length,
+		high: findings.filter((finding) => finding.severity === 'high').length,
+		medium: findings.filter((finding) => finding.severity === 'medium').length,
+		low: findings.filter((finding) => finding.severity === 'low').length,
+		info: findings.filter((finding) => finding.severity === 'info').length
+	};
+	for (const severity of Object.keys(counts) as Array<keyof typeof counts>) {
+		if (summary.counts[severity] !== counts[severity]) {
+			errors.push(`summary count for ${severity} is ${summary.counts[severity]}, actual is ${counts[severity]}`);
+		}
+	}
+	if (summary.findingsCount !== findings.length) {
+		errors.push(`summary findingsCount is ${summary.findingsCount}, actual is ${findings.length}`);
+	}
+	const filesTouched = new Set(findings.map((finding) => finding.path)).size;
+	if (summary.filesTouched !== filesTouched) {
+		errors.push(`summary filesTouched is ${summary.filesTouched}, actual is ${filesTouched}`);
+	}
+	if (counts.critical > 1) errors.push('at most one critical finding is allowed');
+	throwContentErrors('review', errors);
 
 	return { meta, summary, findings };
+}
+
+// ---------------------------------------------------------------------------
+// Diff filters
+// ---------------------------------------------------------------------------
+
+/** Load per-PR filter spec from `<base>/diff/filters.json`. Missing or
+ *  malformed files return an empty spec — filters are strictly additive so a
+ *  broken per-PR layer must never break the diff surface. */
+export async function loadDiffFilters(base: string): Promise<FilterSpec> {
+	const path = join(base, 'diff', 'filters.json');
+	let text: string;
+	try {
+		text = await readFile(path, 'utf8');
+	} catch {
+		return { version: 1, filters: [] };
+	}
+	let json: unknown;
+	try {
+		json = JSON.parse(text);
+	} catch (err) {
+		console.warn(
+			`[lectern-fs] diff/filters.json is not JSON at ${path}: ${err instanceof Error ? err.message : String(err)}`
+		);
+		return { version: 1, filters: [] };
+	}
+	const parsed = FilterSpecSchema.safeParse(json);
+	if (!parsed.success) {
+		console.warn(
+			`[lectern-fs] diff/filters.json failed schema at ${path}: ${parsed.error.message}`
+		);
+		return { version: 1, filters: [] };
+	}
+	return parsed.data;
 }
 
 // ---------------------------------------------------------------------------
@@ -398,7 +497,11 @@ function freshSession(): SessionState {
 		currentView: 'slides',
 		currentSlide: 0,
 		currentQuestion: null,
-		quizCursor: { answered: [], skipped: [] }
+		quizCursor: { answered: [], skipped: [] },
+		diffFilters: {},
+		diffFileOverrides: [],
+		diffSearch: { pattern: '', kind: 'glob' },
+		diffCollapsedFiles: []
 	};
 }
 
@@ -508,7 +611,10 @@ async function renderPlantumlFences(body: string, base: string): Promise<string>
 
 function runPlantuml(source: string): Promise<string> {
 	return new Promise((resolve, reject) => {
-		const child = spawn('java', ['-jar', PLANTUML_JAR, '-pipe', '-tsvg', '-charset', 'UTF-8'], { shell: false });
+		const child = spawn('java', ['-jar', PLANTUML_JAR, '-pipe', '-tsvg', '-charset', 'UTF-8'], {
+			shell: false,
+			windowsHide: true
+		});
 		let stdout = Buffer.alloc(0);
 		let stderr = '';
 		child.stdout.on('data', (b: Buffer) => { stdout = Buffer.concat([stdout, b]); });

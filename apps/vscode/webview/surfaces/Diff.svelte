@@ -1,24 +1,79 @@
 <script lang="ts">
-	interface FileHunk {
-		header: string;
-		lines: Array<{ kind: '+' | '-' | ' '; oldLine: number | null; newLine: number | null; text: string }>;
-	}
-	interface FileDiff {
-		oldPath: string;
-		newPath: string;
-		hunks: FileHunk[];
-		mode: 'modified' | 'added' | 'deleted' | 'renamed';
-	}
+	import ChipBar from './diff/ChipBar.svelte';
+	import SearchBox from './diff/SearchBox.svelte';
+	import HiddenStrip from './diff/HiddenStrip.svelte';
+	import FileTree from './diff/FileTree.svelte';
+	import { BUILTIN_FILTERS } from '../lib/builtinFilters';
+	import {
+		applyFilters,
+		compileFilters,
+		isCollapsed,
+		isDimmed,
+		type FileDiff,
+		type FileHunk,
+		type FilterSpec
+	} from '../lib/diffFilters';
 
-	let { diff }: { diff: string | null } = $props();
+	interface FilterLayers { user?: FilterSpec; perPr?: FilterSpec }
+	interface SessionShape {
+		diffFilters?: Record<string, boolean>;
+		diffFileOverrides?: string[];
+		diffSearch?: { pattern: string; kind: 'glob' | 'regex' };
+		diffCollapsedFiles?: string[];
+	}
+	interface VsCodeApi { postMessage(msg: unknown): void }
+
+	let {
+		diff,
+		filterLayers,
+		session,
+		vscode
+	}: {
+		diff: string | null;
+		filterLayers: FilterLayers | null;
+		session: SessionShape | null;
+		vscode: VsCodeApi;
+	} = $props();
 
 	let mode = $state<'unified' | 'split'>('unified');
-	let collapsed = $state<Record<string, boolean>>({});
+	let selectedPath = $state<string | null>(null);
 
-	function parseDiff(src: string): FileDiff[] {
-		const out: FileDiff[] = [];
+	// Session-persisted state, shadowed locally so toggles feel instant.
+	let activeById = $state<Record<string, boolean>>({});
+	let overrides = $state<string[]>([]);
+	let searchPattern = $state<string>('');
+	let searchKind = $state<'glob' | 'regex'>('glob');
+	let collapsedFiles = $state<Record<string, boolean>>({});
+	let hydratedFrom = $state<SessionShape | null>(null);
+	$effect(() => {
+		// Hydrate once per session identity change (fresh sendInit).
+		if (session && session !== hydratedFrom) {
+			activeById = { ...(session.diffFilters ?? {}) };
+			overrides = [...(session.diffFileOverrides ?? [])];
+			searchPattern = session.diffSearch?.pattern ?? '';
+			searchKind = session.diffSearch?.kind ?? 'glob';
+			collapsedFiles = Object.fromEntries((session.diffCollapsedFiles ?? []).map((p) => [p, true]));
+			hydratedFrom = session;
+		}
+	});
+
+	// Merge filter layers, later id wins.
+	const mergedSpec = $derived.by<FilterSpec>(() => {
+		const byId = new Map<string, FilterSpec['filters'][number]>();
+		const layers: FilterSpec[] = [BUILTIN_FILTERS];
+		if (filterLayers?.user) layers.push(filterLayers.user);
+		if (filterLayers?.perPr) layers.push(filterLayers.perPr);
+		for (const layer of layers) for (const f of layer.filters) byId.set(f.id, f);
+		return { version: 1, filters: [...byId.values()] };
+	});
+	const compiled = $derived(compileFilters(mergedSpec));
+
+	interface ParsedFile { oldPath: string; newPath: string; mode: FileDiff['mode']; hunks: FileHunk[] }
+
+	function parseDiff(src: string): ParsedFile[] {
+		const out: ParsedFile[] = [];
 		const lines = src.split('\n');
-		let cur: FileDiff | null = null;
+		let cur: ParsedFile | null = null;
 		let hunk: FileHunk | null = null;
 		let oldLine = 0;
 		let newLine = 0;
@@ -26,22 +81,14 @@
 			if (raw.startsWith('diff --git ')) {
 				if (cur) out.push(cur);
 				const m = raw.match(/a\/(.+?)\s+b\/(.+)$/);
-				cur = {
-					oldPath: m?.[1] ?? '',
-					newPath: m?.[2] ?? '',
-					hunks: [],
-					mode: 'modified'
-				};
+				cur = { oldPath: m?.[1] ?? '', newPath: m?.[2] ?? '', hunks: [], mode: 'modified' };
 				hunk = null;
 			} else if (!cur) {
 				continue;
-			} else if (raw.startsWith('new file mode')) {
-				cur.mode = 'added';
-			} else if (raw.startsWith('deleted file mode')) {
-				cur.mode = 'deleted';
-			} else if (raw.startsWith('rename ')) {
-				cur.mode = 'renamed';
-			} else if (raw.startsWith('@@')) {
+			} else if (raw.startsWith('new file mode')) { cur.mode = 'added'; }
+			else if (raw.startsWith('deleted file mode')) { cur.mode = 'deleted'; }
+			else if (raw.startsWith('rename ')) { cur.mode = 'renamed'; }
+			else if (raw.startsWith('@@')) {
 				const m = raw.match(/@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@(.*)/);
 				if (m) {
 					oldLine = parseInt(m[1] ?? '0', 10);
@@ -60,8 +107,6 @@
 					hunk.lines.push({ kind: ' ', oldLine, newLine, text: raw.slice(1) });
 					oldLine++;
 					newLine++;
-				} else if (raw === '\\ No newline at end of file') {
-					// skip trailer
 				}
 			}
 		}
@@ -69,37 +114,92 @@
 		return out;
 	}
 
-	const files = $derived(diff ? parseDiff(diff) : []);
+	const parsedFiles = $derived<FileDiff[]>(diff ? parseDiff(diff) : []);
+	const result = $derived(
+		applyFilters(parsedFiles, {
+			compiled,
+			activeById,
+			overrides,
+			search: searchPattern ? { pattern: searchPattern, kind: searchKind } : null
+		})
+	);
 	const totalAdds = $derived(
-		files.reduce(
+		result.visibleFiles.reduce(
 			(n, f) => n + f.hunks.reduce((m, h) => m + h.lines.filter((l) => l.kind === '+').length, 0),
 			0
 		)
 	);
 	const totalDels = $derived(
-		files.reduce(
+		result.visibleFiles.reduce(
 			(n, f) => n + f.hunks.reduce((m, h) => m + h.lines.filter((l) => l.kind === '-').length, 0),
 			0
 		)
 	);
+	const hasOverrides = $derived(
+		Object.keys(activeById).length > 0 || overrides.length > 0 || searchPattern.length > 0
+	);
 
-	function toggle(path: string): void {
-		collapsed[path] = !collapsed[path];
+	function persist(): void {
+		vscode.postMessage({
+			type: 'saveSession',
+			patch: {
+				diffFilters: activeById,
+				diffFileOverrides: overrides,
+				diffSearch: { pattern: searchPattern, kind: searchKind },
+				diffCollapsedFiles: Object.entries(collapsedFiles).filter(([, v]) => v).map(([k]) => k)
+			}
+		});
+	}
+
+	function toggleFilter(id: string, next: boolean): void {
+		activeById = { ...activeById, [id]: next };
+		persist();
+	}
+	function resetOverrides(): void {
+		activeById = {};
+		overrides = [];
+		searchPattern = '';
+		searchKind = 'glob';
+		persist();
+	}
+	function onSearchChange(pattern: string, kind: 'glob' | 'regex'): void {
+		searchPattern = pattern;
+		searchKind = kind;
+		persist();
+	}
+	function revealFile(path: string): void {
+		if (!overrides.includes(path)) {
+			overrides = [...overrides, path];
+			persist();
+		}
+	}
+	function revealAllHidden(): void {
+		const paths = result.hiddenFiles.map((f) => f.newPath || f.oldPath);
+		overrides = Array.from(new Set([...overrides, ...paths]));
+		persist();
+	}
+	function toggleFileCollapsed(path: string): void {
+		collapsedFiles = { ...collapsedFiles, [path]: !collapsedFiles[path] };
+		persist();
+	}
+	function selectFile(path: string): void {
+		selectedPath = path;
+		const el = document.getElementById(`file-${cssId(path)}`);
+		el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+	}
+	function cssId(path: string): string {
+		return path.replace(/[^a-z0-9]/gi, '-');
 	}
 
 	function splitHunk(hunk: FileHunk): { old: FileHunk['lines']; new: FileHunk['lines'] } {
-		// Align -/+ lines side-by-side. Context stays on both. -/+ pair on same row.
 		const oldSide: FileHunk['lines'] = [];
 		const newSide: FileHunk['lines'] = [];
 		let i = 0;
 		const rows = hunk.lines;
 		while (i < rows.length) {
 			const row = rows[i]!;
-			if (row.kind === ' ') {
-				oldSide.push(row);
-				newSide.push(row);
-				i++;
-			} else if (row.kind === '-') {
+			if (row.kind === ' ') { oldSide.push(row); newSide.push(row); i++; }
+			else if (row.kind === '-') {
 				const dels: FileHunk['lines'] = [];
 				const adds: FileHunk['lines'] = [];
 				while (i < rows.length && rows[i]!.kind === '-') { dels.push(rows[i]!); i++; }
@@ -110,7 +210,6 @@
 					newSide.push(adds[k] ?? { kind: ' ', oldLine: null, newLine: null, text: '' });
 				}
 			} else {
-				// pure + block
 				const adds: FileHunk['lines'] = [];
 				while (i < rows.length && rows[i]!.kind === '+') { adds.push(rows[i]!); i++; }
 				for (const a of adds) {
@@ -124,93 +223,156 @@
 </script>
 
 {#if !diff}
-	<div class="empty-shell"><p class="empty">No diff on disk. Skill writes it into <code>diff/source.diff</code>.</p></div>
-{:else if false}
-	<pre class="raw-diff">{diff}</pre>
+	<div class="empty-shell">
+		<p class="empty">
+			No diff on disk yet. The skill writes it into <code>diff/source.diff</code>.
+		</p>
+		<p class="empty-hint">
+			To review this MR without waiting for the skill, use the
+			<strong>MR tab</strong>: it fetches the diff live from GitLab.
+		</p>
+	</div>
 {:else}
-	<header class="diff-head">
-		<div class="stats">
-			<span class="files-badge">{files.length} file{files.length === 1 ? '' : 's'}</span>
-			<span class="adds">+{totalAdds}</span>
-			<span class="dels">-{totalDels}</span>
-		</div>
-		<div class="mode-toggle" role="tablist" aria-label="Diff view mode">
-			<button class="mode-btn" class:active={mode === 'unified'} onclick={() => (mode = 'unified')}>Unified</button>
-			<button class="mode-btn" class:active={mode === 'split'} onclick={() => (mode = 'split')}>Side-by-side</button>
-		</div>
-	</header>
+	<div class="diff-root">
+		<header class="diff-head">
+			<div class="head-row">
+				<div class="stats">
+					<span class="files-badge">{result.visibleFiles.length} of {parsedFiles.length} file{parsedFiles.length === 1 ? '' : 's'}</span>
+					<span class="adds">+{totalAdds}</span>
+					<span class="dels">-{totalDels}</span>
+				</div>
+				<SearchBox pattern={searchPattern} kind={searchKind} onChange={onSearchChange} />
+				<div class="mode-toggle" role="tablist" aria-label="Diff view mode">
+					<button class="mode-btn" class:active={mode === 'unified'} onclick={() => (mode = 'unified')}>Unified</button>
+					<button class="mode-btn" class:active={mode === 'split'} onclick={() => (mode = 'split')}>Side-by-side</button>
+				</div>
+			</div>
+			<ChipBar
+				filters={mergedSpec.filters}
+				{activeById}
+				chipCounts={result.chipCounts}
+				onToggle={toggleFilter}
+				onReset={resetOverrides}
+				{hasOverrides}
+			/>
+		</header>
 
-	<section class="files">
-		{#each files as f, fi}
-			{@const path = f.newPath || f.oldPath}
-			{@const adds = f.hunks.reduce((n, h) => n + h.lines.filter((l) => l.kind === '+').length, 0)}
-			{@const dels = f.hunks.reduce((n, h) => n + h.lines.filter((l) => l.kind === '-').length, 0)}
-			<article class="file">
-				<button class="file-head" onclick={() => toggle(path)} aria-expanded={!collapsed[path]}>
-					<span class="chevron">{collapsed[path] ? '▶' : '▼'}</span>
-					<span class="file-mode mode-{f.mode}">{f.mode}</span>
-					<code class="file-path">{path}</code>
-					<span class="file-stats">
-						<span class="adds">+{adds}</span>
-						<span class="dels">-{dels}</span>
-					</span>
-				</button>
-				{#if !collapsed[path]}
-					{#each f.hunks as h, hi}
-						<div class="hunk">
-							<div class="hunk-header"><code>{h.header}</code></div>
-							{#if mode === 'unified'}
-								<table class="diff-table unified">
-									<tbody>
-										{#each h.lines as l, li}
-											<tr class="row row-{l.kind === '+' ? 'add' : l.kind === '-' ? 'del' : 'ctx'}">
-												<td class="gutter old">{l.oldLine ?? ''}</td>
-												<td class="gutter new">{l.newLine ?? ''}</td>
-												<td class="mark">{l.kind}</td>
-												<td class="line-content">{l.text}</td>
-											</tr>
-										{/each}
-									</tbody>
-								</table>
-							{:else}
-								{@const s = splitHunk(h)}
-								<table class="diff-table split">
-									<tbody>
-										{#each s.old as _oldLine, li}
-											{@const ol = s.old[li]!}
-											{@const nl = s.new[li]!}
-											<tr>
-												<td class="gutter old">{ol.oldLine ?? ''}</td>
-												<td class="line-content side row-{ol.kind === '-' ? 'del' : ol.kind === ' ' && ol.text === '' ? 'blank' : 'ctx'}">{ol.text}</td>
-												<td class="gutter new">{nl.newLine ?? ''}</td>
-												<td class="line-content side row-{nl.kind === '+' ? 'add' : nl.kind === ' ' && nl.text === '' ? 'blank' : 'ctx'}">{nl.text}</td>
-											</tr>
-										{/each}
-									</tbody>
-								</table>
+		<div class="body">
+			<aside class="rail">
+				<FileTree files={result.visibleFiles} {selectedPath} onSelect={selectFile} />
+			</aside>
+			<section class="files">
+				<HiddenStrip
+					hiddenFiles={result.hiddenFiles}
+					onRevealAll={revealAllHidden}
+					onRevealOne={revealFile}
+				/>
+				{#each result.visibleFiles as f}
+					{@const path = f.newPath || f.oldPath}
+					{@const adds = f.hunks.reduce((n, h) => n + h.lines.filter((l) => l.kind === '+').length, 0)}
+					{@const dels = f.hunks.reduce((n, h) => n + h.lines.filter((l) => l.kind === '-').length, 0)}
+					{@const overridden = overrides.includes(path) && f.filterEffects?.some((e) => e.action === 'hide')}
+					<article class="file" id="file-{cssId(path)}" class:overridden>
+						<button class="file-head" onclick={() => toggleFileCollapsed(path)} aria-expanded={!collapsedFiles[path]}>
+							<span class="chevron">{collapsedFiles[path] ? '▶' : '▼'}</span>
+							<span class="file-mode mode-{f.mode}">{f.mode}</span>
+							<code class="file-path">{path}</code>
+							{#if f.filterEffects && f.filterEffects.length > 0}
+								<span class="file-effects">
+									{#each f.filterEffects as eff}
+										<span class="effect effect-{eff.action}" title={eff.filterId}>{eff.label}</span>
+									{/each}
+								</span>
 							{/if}
-						</div>
-					{/each}
-					{#if f.hunks.length === 0}
-						<div class="binary-note">Binary or no visible hunks.</div>
-					{/if}
+							<span class="file-stats">
+								<span class="adds">+{adds}</span>
+								<span class="dels">-{dels}</span>
+							</span>
+						</button>
+						{#if !collapsedFiles[path]}
+							{#each f.hunks as h}
+								{@const collapsed = isCollapsed(h.filterEffects)}
+								<div class="hunk" class:hunk-collapsed={collapsed}>
+									<div class="hunk-header">
+										<code>{h.header}</code>
+										{#if h.filterEffects && h.filterEffects.length > 0}
+											{#each h.filterEffects as eff}
+												<span class="effect effect-{eff.action}">{eff.label}</span>
+											{/each}
+										{/if}
+									</div>
+									{#if !collapsed}
+										{#if mode === 'unified'}
+											<table class="diff-table unified">
+												<tbody>
+													{#each h.lines as l}
+														<tr class="row row-{l.kind === '+' ? 'add' : l.kind === '-' ? 'del' : 'ctx'}" class:dimmed={isDimmed(l.filterEffects)}>
+															<td class="gutter old">{l.oldLine ?? ''}</td>
+															<td class="gutter new">{l.newLine ?? ''}</td>
+															<td class="mark">{l.kind}</td>
+															<td class="line-content">{l.text}</td>
+														</tr>
+													{/each}
+												</tbody>
+											</table>
+										{:else}
+											{@const s = splitHunk(h)}
+											<table class="diff-table split">
+												<tbody>
+													{#each s.old as _oldLine, li}
+														{@const ol = s.old[li]!}
+														{@const nl = s.new[li]!}
+														<tr>
+															<td class="gutter old">{ol.oldLine ?? ''}</td>
+															<td class="line-content side row-{ol.kind === '-' ? 'del' : ol.kind === ' ' && ol.text === '' ? 'blank' : 'ctx'}" class:dimmed={isDimmed(ol.filterEffects)}>{ol.text}</td>
+															<td class="gutter new">{nl.newLine ?? ''}</td>
+															<td class="line-content side row-{nl.kind === '+' ? 'add' : nl.kind === ' ' && nl.text === '' ? 'blank' : 'ctx'}" class:dimmed={isDimmed(nl.filterEffects)}>{nl.text}</td>
+														</tr>
+													{/each}
+												</tbody>
+											</table>
+										{/if}
+									{/if}
+								</div>
+							{/each}
+							{#if f.hunks.length === 0}
+								<div class="binary-note">Binary or no visible hunks.</div>
+							{/if}
+						{/if}
+					</article>
+				{/each}
+				{#if result.visibleFiles.length === 0}
+					<p class="empty">All files are hidden by current filters.</p>
 				{/if}
-			</article>
-		{/each}
-	</section>
+			</section>
+		</div>
+	</div>
 {/if}
 
 <style>
 	.empty-shell {
 		display: flex;
+		flex-direction: column;
 		align-items: center;
 		justify-content: center;
+		gap: 8px;
 		min-height: 40vh;
+		padding: 24px;
 	}
 	.empty {
 		color: var(--vscode-descriptionForeground);
 		font-style: italic;
 		text-align: center;
+		margin: 0;
+	}
+	.empty-hint {
+		color: var(--vscode-descriptionForeground);
+		text-align: center;
+		margin: 0;
+		font-size: 12px;
+	}
+	.empty-hint strong {
+		color: var(--vscode-foreground);
 	}
 	.empty code {
 		font-family: var(--vscode-editor-font-family, monospace);
@@ -218,14 +380,27 @@
 		background: var(--vscode-textCodeBlock-background, var(--vscode-editor-background));
 		border-radius: 3px;
 	}
+	.diff-root {
+		display: flex;
+		flex-direction: column;
+		height: 100%;
+	}
 	.diff-head {
-		max-width: 1200px;
-		margin: 20px auto 12px;
-		padding: 8px 20px;
+		padding: 8px 16px;
+		display: flex;
+		flex-direction: column;
+		gap: 8px;
+		border-bottom: 1px solid var(--vscode-panel-border, transparent);
+		position: sticky;
+		top: 0;
+		background: var(--vscode-editor-background);
+		z-index: 5;
+	}
+	.head-row {
 		display: flex;
 		align-items: center;
-		gap: 16px;
-		border-bottom: 1px solid var(--vscode-panel-border, transparent);
+		gap: 12px;
+		flex-wrap: wrap;
 	}
 	.stats {
 		display: flex;
@@ -261,10 +436,24 @@
 		color: var(--vscode-list-activeSelectionForeground);
 		border-color: var(--vscode-focusBorder);
 	}
+	.body {
+		display: flex;
+		flex: 1;
+		min-height: 0;
+	}
+	.rail {
+		width: 260px;
+		min-width: 200px;
+		max-width: 380px;
+		overflow: auto;
+		border-right: 1px solid var(--vscode-panel-border, transparent);
+		background: var(--vscode-sideBar-background);
+	}
 	.files {
-		max-width: 1200px;
-		margin: 0 auto;
-		padding: 0 20px 32px;
+		flex: 1;
+		min-width: 0;
+		overflow: auto;
+		padding: 12px 16px 32px;
 		display: flex;
 		flex-direction: column;
 		gap: 12px;
@@ -274,6 +463,7 @@
 		border-radius: 4px;
 		overflow: hidden;
 	}
+	.file.overridden { outline: 1px dashed hsl(35 60% 50% / 0.5); }
 	.file-head {
 		display: flex;
 		align-items: center;
@@ -311,6 +501,22 @@
 		text-overflow: ellipsis;
 		white-space: nowrap;
 	}
+	.file-effects, .effect {
+		display: inline-flex;
+		gap: 4px;
+	}
+	.effect {
+		font-size: 10px;
+		padding: 1px 6px;
+		border-radius: 999px;
+		background: var(--vscode-editorWidget-background, transparent);
+		color: var(--vscode-descriptionForeground);
+		border: 1px solid var(--vscode-panel-border, transparent);
+	}
+	.effect-collapse { border-color: hsl(35 60% 50% / 0.6); color: hsl(35 80% 70%); }
+	.effect-dim { border-color: hsl(210 60% 50% / 0.6); color: hsl(210 70% 75%); }
+	.effect-hide { border-color: hsl(0 60% 50% / 0.6); color: hsl(0 70% 75%); }
+	.effect-mark { border-color: hsl(140 60% 50% / 0.6); color: hsl(140 70% 75%); }
 	.file-stats {
 		display: inline-flex;
 		gap: 8px;
@@ -320,12 +526,15 @@
 	.hunk {
 		border-top: 1px solid var(--vscode-panel-border, transparent);
 	}
+	.hunk-collapsed .hunk-header { opacity: 0.7; }
 	.hunk-header {
 		padding: 4px 12px;
 		font-size: 11px;
 		color: var(--vscode-descriptionForeground);
-		background: var(--vscode-editorLineNumber-foreground, transparent);
 		background: var(--vscode-editorWidget-background, var(--vscode-sideBar-background));
+		display: flex;
+		align-items: center;
+		gap: 8px;
 	}
 	.hunk-header code {
 		font-family: var(--vscode-editor-font-family, monospace);
@@ -361,6 +570,7 @@
 	.row-del .mark { color: hsl(0 70% 70%); }
 	.row-blank { background: var(--vscode-diffEditor-diagonalFill, transparent); opacity: 0.4; }
 	.diff-table.split .side { border-left: 1px solid var(--vscode-panel-border, transparent); }
+	.dimmed { opacity: 0.4; }
 	.binary-note {
 		padding: 12px;
 		color: var(--vscode-descriptionForeground);

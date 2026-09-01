@@ -21,8 +21,7 @@
     "onCommand:lectern.openPR",
     "onCommand:lectern.showSlides",
     "onCommand:lectern.showQuiz",
-    "onCommand:lectern.showReview",
-    "onCommand:lectern.showDiff"
+    "onCommand:lectern.showReview"
   ],
   "contributes": {
     "viewsContainers": {
@@ -85,11 +84,6 @@
         "category": "Lectern"
       },
       {
-        "command": "lectern.showDiff",
-        "title": "Lectern: Show Diff",
-        "category": "Lectern"
-      },
-      {
         "command": "lectern.refresh",
         "title": "Refresh",
         "category": "Lectern",
@@ -135,6 +129,38 @@
           "default": "git.cgm.ag",
           "scope": "machine",
           "description": "GitLab hostname for the PR inbox fetch (e.g. git.cgm.ag)."
+        },
+        "lectern.diffFilters": {
+          "type": "array",
+          "default": [],
+          "scope": "window",
+          "description": "User-level diff filters. Appended after built-ins and before per-PR filters; later id wins.",
+          "items": {
+            "type": "object",
+            "required": ["id", "label", "scope", "match", "action"],
+            "properties": {
+              "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
+              "label": { "type": "string" },
+              "scope": { "enum": ["file", "hunk", "line"] },
+              "action": { "enum": ["hide", "collapse", "dim", "mark"] },
+              "defaultOn": { "type": "boolean", "default": false },
+              "description": { "type": "string" },
+              "match": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "pathGlob": { "type": "array", "items": { "type": "string" } },
+                  "pathRegex": { "type": "string" },
+                  "mode": { "enum": ["added", "deleted", "renamed", "modified"] },
+                  "linesChangedAbove": { "type": "integer", "minimum": 1 },
+                  "whitespaceOnly": { "type": "boolean" },
+                  "lineRegex": { "type": "string" },
+                  "anyLineMatches": { "type": "string" },
+                  "allLinesMatch": { "type": "string" }
+                }
+              }
+            }
+          }
         }
       }
     }

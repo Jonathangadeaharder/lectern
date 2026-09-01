@@ -11,7 +11,11 @@
 		"isolatedModules": true,
 		"verbatimModuleSyntax": true,
 		"types": ["svelte"],
-		"noEmit": true
+		"noEmit": true,
+		"baseUrl": ".",
+		"paths": {
+			"$lib/*": ["../../../src/lib/*"]
+		}
 	},
-	"include": ["**/*.ts", "**/*.svelte"]
+	"include": ["**/*.ts", "**/*.svelte", "../../../src/lib/client/mr/**/*", "../../../src/lib/shared/mr/**/*"]
 }

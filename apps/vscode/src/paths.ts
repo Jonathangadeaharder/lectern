@@ -26,8 +26,13 @@ export function repoShaFromPath(absRepoPath: string): string {
     return createHash("sha256").update(normalized).digest("hex").slice(0, 16);
 }
 
+export function canonicalPrRef(prRef: string | number): string {
+    const value = String(prRef).trim();
+    return /^\d+$/.test(value) ? `mr-${Number.parseInt(value, 10)}` : value;
+}
+
 export function basePath(repoSha: string, prRef: string): string {
-    return path.join(lecternRoot(), "repos", repoSha, prRef);
+    return path.join(lecternRoot(), "repos", repoSha, canonicalPrRef(prRef));
 }
 
 function stateFile(): string {
